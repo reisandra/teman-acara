@@ -261,19 +261,11 @@ export default function Login() {
             </div>
           )}
 
-          {/* Become Talent CTA */}
-          <div className="mt-6 pt-6 border-t">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-3">
-                Ingin jadi teman pendamping profesional?
-              </p>
-              <Link to="/talent-registration">
-                <Button variant="outline" className="w-full gap-2">
-                  <User className="w-4 h-4" />
-                  Daftar sebagai Talent
-                </Button>
-              </Link>
-            </div>
+          {/* Info */}
+          <div className="mt-6 pt-6 border-t text-center">
+            <p className="text-xs text-muted-foreground">
+              Dengan masuk, Anda menyetujui Syarat & Ketentuan serta Kebijakan Privasi RentMate
+            </p>
           </div>
         </Card>
 

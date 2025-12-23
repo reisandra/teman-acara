@@ -15,8 +15,6 @@ import {
   HelpCircle,
   FileText,
   Bell,
-  Crown,
-  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -66,11 +64,6 @@ export default function Profile() {
     bookingId: string;
   }>({ isOpen: false, talentId: "", bookingId: "" });
   const [ratedBookings, setRatedBookings] = useState<string[]>([]);
-  
-  // Check user role from localStorage (UI state only)
-  const [userRole, setUserRole] = useState<"user" | "talent">(() => {
-    return (localStorage.getItem("userRole") as "user" | "talent") || "user";
-  });
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -107,17 +100,10 @@ export default function Profile() {
             <div className="flex-1 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
                 <h1 className="text-2xl font-bold">{mockUser.name}</h1>
-                {userRole === "talent" ? (
-                  <Badge variant="default" className="gap-1">
-                    <Crown className="w-3 h-3" />
-                    Talent
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    <User className="w-3 h-3" />
-                    User
-                  </Badge>
-                )}
+                <Badge variant="secondary" className="gap-1">
+                  <User className="w-3 h-3" />
+                  User
+                </Badge>
               </div>
               <p className="text-muted-foreground mb-2">{mockUser.email}</p>
               <div className="flex flex-wrap justify-center md:justify-start gap-3 text-sm text-muted-foreground">
@@ -137,21 +123,6 @@ export default function Profile() {
                 <Edit3 className="w-4 h-4" />
                 Edit Profil
               </Button>
-              {userRole === "user" ? (
-                <Link to="/talent-registration">
-                  <Button variant="hero" className="gap-2 w-full">
-                    <Star className="w-4 h-4" />
-                    Daftar sebagai Talent
-                  </Button>
-                </Link>
-              ) : (
-                <Link to="/talent-dashboard">
-                  <Button variant="hero" className="gap-2 w-full">
-                    <Users className="w-4 h-4" />
-                    Dashboard Talent
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
         </Card>

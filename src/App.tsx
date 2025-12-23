@@ -14,6 +14,8 @@ import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
 import Admin from "./pages/Admin";
+import TalentRegistration from "./pages/TalentRegistration";
+import TalentDashboard from "./pages/TalentDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +39,8 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/talent-registration" element={<TalentRegistration />} />
+          <Route path="/talent-dashboard" element={<TalentDashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

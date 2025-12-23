@@ -48,22 +48,41 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
+  // Helper to mark all user messages as read
+  const markAllUserMessagesAsRead = (msgs: ChatMessage[]): ChatMessage[] => {
+    return msgs.map((msg) =>
+      msg.senderType === "user" && msg.status !== "read"
+        ? { ...msg, status: "read" as const }
+        : msg
+    );
+  };
+
   const handleSend = () => {
     if (!newMessage.trim()) return;
 
+    const messageId = `m${Date.now()}`;
     const message: ChatMessage = {
-      id: `m${Date.now()}`,
+      id: messageId,
       senderId: "user1",
       senderType: "user",
       message: newMessage,
       timestamp: new Date().toISOString(),
-      status: "sent",
+      status: "sent", // Start with single tick
     };
 
-    setMessages([...messages, message]);
+    setMessages((prev) => [...prev, message]);
     setNewMessage("");
 
-    // Simulate contextual talent response
+    // Simulate: after 1 second, change to delivered (double tick gray)
+    setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, status: "delivered" as const } : msg
+        )
+      );
+    }, 1000);
+
+    // Simulate contextual talent response after 2 seconds
     setTimeout(() => {
       const contextualMessage = getContextualResponse(newMessage, talent?.name || "");
       const response: ChatMessage = {
@@ -74,8 +93,10 @@ export default function Chat() {
         timestamp: new Date().toISOString(),
         status: "delivered",
       };
-      setMessages((prev) => [...prev, response]);
-    }, 1500);
+      
+      // When talent replies, mark ALL previous user messages as read (orange double tick)
+      setMessages((prev) => [...markAllUserMessagesAsRead(prev), response]);
+    }, 2000);
   };
 
   const formatDate = (dateString: string) => {

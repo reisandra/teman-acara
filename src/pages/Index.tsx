@@ -293,9 +293,9 @@ export default function Index() {
             <div>
               <h4 className="font-bold mb-4">Bantuan</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-colors">FAQ</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Syarat & Ketentuan</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Kebijakan Privasi</a></li>
+                <li><Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link></li>
+                <li><Link to="/syarat-ketentuan" className="hover:text-primary transition-colors">Syarat & Ketentuan</Link></li>
+                <li><Link to="/kebijakan-privasi" className="hover:text-primary transition-colors">Kebijakan Privasi</Link></li>
               </ul>
             </div>
 

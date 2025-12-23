@@ -17,6 +17,9 @@ import Admin from "./pages/Admin";
 import TalentRegistration from "./pages/TalentRegistration";
 import TalentDashboard from "./pages/TalentDashboard";
 import NotFound from "./pages/NotFound";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsConditions from "./pages/TermsConditions";
+import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +44,9 @@ const App = () => (
           <Route path="/admin" element={<Admin />} />
           <Route path="/talent-registration" element={<TalentRegistration />} />
           <Route path="/talent-dashboard" element={<TalentDashboard />} />
+          <Route path="/kebijakan-privasi" element={<PrivacyPolicy />} />
+          <Route path="/syarat-ketentuan" element={<TermsConditions />} />
+          <Route path="/faq" element={<FAQ />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

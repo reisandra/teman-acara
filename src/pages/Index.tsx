@@ -64,9 +64,9 @@ export default function Index() {
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link to="/register">
+                <Link to="/login">
                   <Button variant="outline" size="xl">
-                    Daftar Sebagai Talent
+                    Masuk / Daftar
                   </Button>
                 </Link>
               </div>
@@ -253,9 +253,9 @@ export default function Index() {
                     Cari Talent Sekarang
                   </Button>
                 </Link>
-                <Link to="/register">
+                <Link to="/login">
                   <Button variant="outline" size="lg" className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary">
-                    Gabung Sebagai Talent
+                    Masuk Sekarang
                   </Button>
                 </Link>
               </div>

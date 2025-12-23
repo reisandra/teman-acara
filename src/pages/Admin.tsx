@@ -42,24 +42,42 @@ const pendingBookings = [
     userName: "Andi Wijaya", 
     userPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
     talentName: "Sarah Putri",
+    talentPhoto: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
     purpose: "Nongkrong / Ngobrol",
     date: "2024-01-25",
     time: "14:00",
     duration: 2,
     total: 300000,
-    status: "pending_approval"
+    paymentStatus: "paid",
+    approvalStatus: "pending_approval"
   },
   { 
     id: "pb2", 
-    userName: "Budi Santoso", 
-    userPhoto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+    userName: "Dian Permata", 
+    userPhoto: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
     talentName: "Maya Indah",
+    talentPhoto: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop&crop=face",
     purpose: "Dinner / Makan Malam",
     date: "2024-01-26",
     time: "19:00",
     duration: 3,
     total: 390000,
-    status: "pending_approval"
+    paymentStatus: "paid",
+    approvalStatus: "pending_approval"
+  },
+  { 
+    id: "pb3", 
+    userName: "Riko Saputra", 
+    userPhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+    talentName: "Lisa Andriani",
+    talentPhoto: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face",
+    purpose: "Temani ke Acara",
+    date: "2024-01-27",
+    time: "10:00",
+    duration: 4,
+    total: 520000,
+    paymentStatus: "paid",
+    approvalStatus: "pending_approval"
   },
 ];
 
@@ -171,70 +189,134 @@ export default function Admin() {
             <TabsTrigger value="revenue">Pendapatan</TabsTrigger>
           </TabsList>
 
-          {/* Pending Approvals Tab - NEW */}
+          {/* Pending Approvals Tab */}
           <TabsContent value="approvals" className="space-y-4">
-            <h2 className="text-xl font-bold">Pemesanan Menunggu Persetujuan</h2>
-            <p className="text-muted-foreground text-sm mb-4">
-              Pemesanan yang sudah dibayar dan menunggu persetujuan admin untuk mengaktifkan percakapan.
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Pemesanan Menunggu Persetujuan</h2>
+                <p className="text-muted-foreground text-sm">
+                  Pemesanan yang sudah dibayar dan menunggu persetujuan admin
+                </p>
+              </div>
+              <Badge variant="outline" className="gap-1">
+                <Clock className="w-3 h-3" />
+                {bookings.length} Menunggu
+              </Badge>
+            </div>
             
             {bookings.length > 0 ? (
-              bookings.map((booking) => (
-                <Card key={booking.id} className="p-4">
-                  <div className="flex items-start gap-4">
-                    <img src={booking.userPhoto} alt={booking.userName} className="w-14 h-14 rounded-full object-cover" />
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="font-bold">{booking.userName}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Memesan: <span className="text-foreground font-medium">{booking.talentName}</span>
-                          </p>
+              <div className="space-y-4">
+                {bookings.map((booking) => (
+                  <Card key={booking.id} className="overflow-hidden">
+                    <div className="p-5">
+                      {/* Header with user & talent info */}
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex items-center gap-3 flex-1">
+                          <img 
+                            src={booking.userPhoto} 
+                            alt={booking.userName} 
+                            className="w-12 h-12 rounded-full object-cover border-2 border-background shadow" 
+                          />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Pengguna</p>
+                            <h3 className="font-bold">{booking.userName}</h3>
+                          </div>
                         </div>
-                        <Badge variant="accent">Menunggu Persetujuan</Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-3">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(booking.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                        
+                        <div className="text-center text-muted-foreground">
+                          <div className="w-8 h-[2px] bg-border mx-auto mb-1" />
+                          <span className="text-xs">memesan</span>
+                          <div className="w-8 h-[2px] bg-border mx-auto mt-1" />
                         </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Clock className="w-3 h-3" />
-                          {booking.time} • {booking.duration} jam
+                        
+                        <div className="flex items-center gap-3 flex-1 justify-end">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Pendamping</p>
+                            <h3 className="font-bold">{booking.talentName}</h3>
+                          </div>
+                          <img 
+                            src={booking.talentPhoto} 
+                            alt={booking.talentName} 
+                            className="w-12 h-12 rounded-full object-cover border-2 border-primary/20 shadow" 
+                          />
                         </div>
-                        <div className="text-muted-foreground">{booking.purpose}</div>
-                        <div className="font-bold text-primary">{formatPrice(booking.total)}</div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          className="gap-1"
-                          onClick={() => handleApproveBooking(booking.id)}
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Setujui
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="gap-1"
-                          onClick={() => handleRejectBooking(booking.id)}
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Tolak
-                        </Button>
+                      {/* Booking details */}
+                      <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Tujuan</p>
+                            <p className="font-medium">{booking.purpose}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Tanggal</p>
+                            <p className="font-medium flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(booking.date).toLocaleDateString("id-ID", { 
+                                day: "numeric", 
+                                month: "short",
+                                year: "numeric"
+                              })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Waktu & Durasi</p>
+                            <p className="font-medium flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {booking.time} • {booking.duration} jam
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Status Pembayaran</p>
+                            <Badge variant="success" className="text-xs">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Sudah Dibayar
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Total Pembayaran</p>
+                            <p className="font-bold text-primary text-lg">{formatPrice(booking.total)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status & Actions */}
+                      <div className="flex items-center justify-between">
+                        <Badge variant="accent" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          Menunggu Persetujuan Admin
+                        </Badge>
+                        
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline"
+                            size="sm" 
+                            className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRejectBooking(booking.id)}
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Tolak Pemesanan
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="gap-1"
+                            onClick={() => handleApproveBooking(booking.id)}
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Setujui Pemesanan
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))
+                  </Card>
+                ))}
+              </div>
             ) : (
               <Card className="p-8 text-center">
                 <CheckCircle className="w-16 h-16 mx-auto text-green-500 mb-4" />
                 <h3 className="text-xl font-bold mb-2">Semua Pemesanan Sudah Diproses</h3>
-                <p className="text-muted-foreground">Tidak ada pemesanan yang menunggu persetujuan</p>
+                <p className="text-muted-foreground">Tidak ada pemesanan yang menunggu persetujuan saat ini</p>
               </Card>
             )}
           </TabsContent>

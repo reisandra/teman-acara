@@ -49,10 +49,10 @@ export function ChatBubble({ message, senderPhoto, senderName }: ChatBubbleProps
           <span>{time}</span>
           {isUser && (
             <>
-              {message.status === "sent" && <Check className="w-3 h-3" />}
-              {message.status === "delivered" && <CheckCheck className="w-3 h-3" />}
+              {message.status === "sent" && <Check className="w-3 h-3 text-muted-foreground" />}
+              {message.status === "delivered" && <CheckCheck className="w-3 h-3 text-muted-foreground" />}
               {message.status === "read" && (
-                <CheckCheck className="w-3 h-3 text-primary" />
+                <CheckCheck className="w-3 h-3 text-[hsl(24,95%,53%)]" />
               )}
             </>
           )}

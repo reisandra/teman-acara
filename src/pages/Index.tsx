@@ -88,15 +88,15 @@ export default function Index() {
                 <div className="space-y-4">
                   <div className="rounded-3xl overflow-hidden shadow-card animate-float">
                     <img
-                      src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&h=500&fit=crop"
-                      alt="Friends having fun"
+                      src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&h=500&fit=crop"
+                      alt="Teman ngobrol di cafe"
                       className="w-full h-64 object-cover"
                     />
                   </div>
                   <div className="rounded-3xl overflow-hidden shadow-card animate-float" style={{ animationDelay: "0.5s" }}>
                     <img
-                      src="https://images.unsplash.com/photo-1543807535-eceef0bc6599?w=400&h=300&fit=crop"
-                      alt="Traveling together"
+                      src="https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=400&h=300&fit=crop"
+                      alt="Traveling bersama teman"
                       className="w-full h-40 object-cover"
                     />
                   </div>
@@ -104,15 +104,15 @@ export default function Index() {
                 <div className="space-y-4 pt-8">
                   <div className="rounded-3xl overflow-hidden shadow-card animate-float" style={{ animationDelay: "0.3s" }}>
                     <img
-                      src="https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=400&h=300&fit=crop"
-                      alt="Coffee date"
+                      src="https://images.unsplash.com/photo-1543269865-cbf427effbad?w=400&h=300&fit=crop"
+                      alt="Ngopi bareng teman"
                       className="w-full h-40 object-cover"
                     />
                   </div>
                   <div className="rounded-3xl overflow-hidden shadow-card animate-float" style={{ animationDelay: "0.7s" }}>
                     <img
-                      src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&h=500&fit=crop"
-                      alt="Group hangout"
+                      src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&h=500&fit=crop"
+                      alt="Hangout bersama"
                       className="w-full h-64 object-cover"
                     />
                   </div>

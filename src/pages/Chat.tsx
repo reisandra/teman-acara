@@ -38,6 +38,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>(chatRoom?.messages || []);
   const [newMessage, setNewMessage] = useState("");
   const [showBookingInfo, setShowBookingInfo] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -82,8 +83,14 @@ export default function Chat() {
       );
     }, 1000);
 
-    // Simulate contextual talent response after 2 seconds
+    // Show typing indicator after 1.2 seconds
     setTimeout(() => {
+      setIsTyping(true);
+    }, 1200);
+
+    // Simulate contextual talent response after 2.5 seconds
+    setTimeout(() => {
+      setIsTyping(false);
       const contextualMessage = getContextualResponse(newMessage, talent?.name || "");
       const response: ChatMessage = {
         id: `m${Date.now() + 1}`,
@@ -96,7 +103,7 @@ export default function Chat() {
       
       // When talent replies, mark ALL previous user messages as read (orange double tick)
       setMessages((prev) => [...markAllUserMessagesAsRead(prev), response]);
-    }, 2000);
+    }, 2500);
   };
 
   const formatDate = (dateString: string) => {
@@ -247,6 +254,24 @@ export default function Chat() {
             senderName={message.senderType === "talent" ? talent.name : "Kamu"}
           />
         ))}
+
+        {/* Typing Indicator */}
+        {isTyping && (
+          <div className="flex gap-2 max-w-[85%] mr-auto animate-fade-in">
+            <img
+              src={talent.photo}
+              alt={talent.name}
+              className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-1"
+            />
+            <div className="bg-chat-talent text-chat-talent-foreground px-4 py-3 rounded-2xl rounded-bl-md">
+              <div className="flex gap-1 items-center h-5">
+                <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:300ms]" />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div ref={messagesEndRef} />
       </div>

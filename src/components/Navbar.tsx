@@ -17,8 +17,8 @@ export function Navbar() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Hide navbar on admin page - admin has its own header
-  if (location.pathname === "/admin") {
+  // Hide navbar on admin pages - admin has its own header
+  if (location.pathname === "/admin" || location.pathname === "/admin-login") {
     return null;
   }
 

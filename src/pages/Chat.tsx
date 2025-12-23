@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ChatBubble } from "@/components/ChatBubble";
-import { talents, mockChatRooms, mockBookings } from "@/data/mockData";
+import { talents, mockChatRooms, mockBookings, getContextualResponse } from "@/data/mockData";
 import type { ChatMessage, Booking } from "@/data/mockData";
 
 export default function Chat() {
@@ -63,19 +63,14 @@ export default function Chat() {
     setMessages([...messages, message]);
     setNewMessage("");
 
-    // Simulate talent response
+    // Simulate contextual talent response
     setTimeout(() => {
-      const responses = [
-        "Terima kasih pesannya! Aku akan segera merespon ya 😊",
-        "Oke siap! Ada yang bisa aku bantu lagi?",
-        "Noted! Sampai ketemu nanti ya 👋",
-        "Baik, terima kasih infonya!",
-      ];
+      const contextualMessage = getContextualResponse(newMessage, talent?.name || "");
       const response: ChatMessage = {
         id: `m${Date.now() + 1}`,
         senderId: talent?.id || "1",
         senderType: "talent",
-        message: responses[Math.floor(Math.random() * responses.length)],
+        message: contextualMessage,
         timestamp: new Date().toISOString(),
         status: "delivered",
       };

@@ -90,38 +90,7 @@ export default function Booking() {
     }, 2000);
   };
 
-  const handleAdminApproval = () => {
-    setIsProcessing(true);
-    
-    // Simulasi approval admin (1.5 detik)
-    setTimeout(() => {
-      setIsProcessing(false);
-      setBookingStatus("approved");
-      
-      const newBookingId = `booking-${Date.now()}`;
-      
-      toast({
-        title: "Pemesanan Disetujui! 🎉",
-        description: "Percakapan dengan pendamping sudah aktif",
-      });
-      
-      // Navigate to chat after approval
-      setTimeout(() => {
-        navigate(`/chat/${newBookingId}`, { 
-          state: { 
-            talentId: talent.id,
-            booking: {
-              id: newBookingId,
-              ...bookingData,
-              talentId: talent.id,
-              totalPrice: totalPrice,
-              status: "active",
-            }
-          } 
-        });
-      }, 1500);
-    }, 1500);
-  };
+  // Admin approval removed - handled only in Admin dashboard
 
   const isStepValid = () => {
     switch (step) {
@@ -453,24 +422,25 @@ export default function Booking() {
                     </div>
                   </Card>
 
-                  {/* Simulasi button untuk demo */}
+                  {/* Info status - read only */}
                   <div className="border-t pt-6">
-                    <p className="text-xs text-muted-foreground mb-3">
-                      (Simulasi UI: Klik untuk menyetujui pemesanan)
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-4">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Menunggu admin menyetujui pemesanan...</span>
+                    </div>
+                    <p className="text-xs text-center text-muted-foreground mt-3">
+                      Kamu akan menerima notifikasi setelah pemesanan disetujui
                     </p>
+                  </div>
+                  
+                  {/* Navigation */}
+                  <div className="flex gap-3 mt-6">
                     <Button 
-                      variant="hero" 
-                      onClick={handleAdminApproval}
-                      disabled={isProcessing}
+                      variant="outline" 
+                      onClick={() => navigate('/bookings')}
+                      className="flex-1"
                     >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Menyetujui...
-                        </>
-                      ) : (
-                        "Setujui Pemesanan (Admin)"
-                      )}
+                      Lihat Pemesanan Saya
                     </Button>
                   </div>
                 </div>

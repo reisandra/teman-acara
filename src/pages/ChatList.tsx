@@ -3,25 +3,12 @@ import { Search, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { talents } from "@/data/mockData";
-
-// Mock active chats
-const activeChats = [
-  {
-    talentId: "1",
-    lastMessage: "Siap! Aku tunggu di lobby ya. Sampai ketemu! 😊",
-    timestamp: "2024-01-20T10:36:00",
-    unread: 2,
-  },
-  {
-    talentId: "3",
-    lastMessage: "Oke, besok ya! Jangan lupa bawa kamera",
-    timestamp: "2024-01-19T15:20:00",
-    unread: 0,
-  },
-];
+import { talents, mockChatRooms, mockBookings } from "@/data/mockData";
+import { useState } from "react";
 
 export default function ChatList() {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -45,6 +32,17 @@ export default function ChatList() {
     }
   };
 
+  // Filter chat rooms based on search
+  const filteredChatRooms = mockChatRooms.filter((chatRoom) => {
+    const talent = talents.find((t) => t.id === chatRoom.talentId);
+    if (!talent) return false;
+    
+    const matchesSearch = talent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      chatRoom.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesSearch;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-24 md:pb-8">
       <div className="container max-w-2xl">
@@ -53,41 +51,58 @@ export default function ChatList() {
         {/* Search */}
         <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input placeholder="Cari percakapan..." className="pl-12 h-12" />
+          <Input 
+            placeholder="Cari percakapan..." 
+            className="pl-12 h-12"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
-        {activeChats.length > 0 ? (
+        {filteredChatRooms.length > 0 ? (
           <div className="space-y-3">
-            {activeChats.map((chat) => {
-              const talent = talents.find((t) => t.id === chat.talentId);
-              if (!talent) return null;
+            {filteredChatRooms.map((chatRoom) => {
+              const talent = talents.find((t) => t.id === chatRoom.talentId);
+              const booking = mockBookings.find((b) => b.id === chatRoom.bookingId);
+              if (!talent || !booking) return null;
 
               return (
-                <Link key={chat.talentId} to={`/chat/${chat.talentId}`}>
+                <Link key={chatRoom.id} to={`/chat/${chatRoom.bookingId}`}>
                   <Card hover className="p-4 flex items-center gap-4">
                     <div className="relative">
                       <img
                         src={talent.photo}
                         alt={talent.name}
-                        className="w-14 h-14 rounded-full object-cover"
+                        className="w-14 h-14 rounded-full object-cover ring-2 ring-primary/10"
                       />
                       <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card" />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold truncate">{talent.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold truncate">{talent.name}</h3>
+                          <Badge 
+                            variant={booking.status === "active" ? "success" : "secondary"}
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            {booking.status === "active" ? "Aktif" : "Selesai"}
+                          </Badge>
+                        </div>
                         <span className="text-xs text-muted-foreground">
-                          {formatTime(chat.timestamp)}
+                          {formatTime(chatRoom.lastMessageTime)}
                         </span>
                       </div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {booking.purpose} • {booking.duration} jam
+                      </p>
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground truncate pr-4">
-                          {chat.lastMessage}
+                          {chatRoom.lastMessage}
                         </p>
-                        {chat.unread > 0 && (
+                        {chatRoom.unreadCount > 0 && (
                           <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                            {chat.unread}
+                            {chatRoom.unreadCount}
                           </Badge>
                         )}
                       </div>
@@ -102,9 +117,13 @@ export default function ChatList() {
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
               <MessageCircle className="w-10 h-10 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-bold mb-2">Belum Ada Chat</h3>
+            <h3 className="text-xl font-bold mb-2">
+              {searchQuery ? "Tidak Ditemukan" : "Belum Ada Chat"}
+            </h3>
             <p className="text-muted-foreground mb-6">
-              Chat akan muncul setelah kamu melakukan booking dengan talent
+              {searchQuery 
+                ? "Coba kata kunci lain atau cari talent baru"
+                : "Chat akan muncul setelah kamu melakukan booking dengan talent"}
             </p>
             <Link to="/talents">
               <button className="text-primary font-semibold hover:underline">

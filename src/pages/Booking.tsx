@@ -70,13 +70,28 @@ export default function Booking() {
   };
 
   const handleConfirm = () => {
-    // Mock booking confirmation
+    // Create a new booking ID
+    const newBookingId = `booking-${Date.now()}`;
+    
     toast({
       title: "Booking Berhasil! 🎉",
-      description: "Kamu akan diarahkan ke halaman chat",
+      description: "Kamu akan diarahkan ke halaman chat dengan talent",
     });
+    
+    // Navigate to chat with booking ID
     setTimeout(() => {
-      navigate(`/chat/${talent.id}`);
+      navigate(`/chat/${newBookingId}`, { 
+        state: { 
+          talentId: talent.id,
+          booking: {
+            id: newBookingId,
+            ...bookingData,
+            talentId: talent.id,
+            totalPrice: totalPrice,
+            status: "active",
+          }
+        } 
+      });
     }, 1500);
   };
 

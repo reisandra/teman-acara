@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Users, Calendar, MessageCircle, User, Shield, Menu, X } from "lucide-react";
+import { Home, Users, Calendar, MessageCircle, User, Shield, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+// Role types for UI state
+type UserRole = "user" | "talent" | "admin";
+
+// Mock current user role - In real app, this would come from auth context
+// Set to "user" so Admin menu is hidden for normal users
+const currentUserRole: UserRole = "user";
+
+const userNavItems = [
   { label: "Beranda", path: "/", icon: Home },
   { label: "Pendamping", path: "/talents", icon: Users },
   { label: "Pemesanan", path: "/bookings", icon: Calendar },
@@ -12,13 +19,120 @@ const navItems = [
   { label: "Profil", path: "/profile", icon: User },
 ];
 
-const adminItem = { label: "Admin", path: "/admin", icon: Shield };
+const adminNavItems = [
+  { label: "Dasbor Admin", path: "/admin", icon: Shield },
+];
 
 export function Navbar() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isAdmin = true; // Mock admin status
+  
+  const isAdmin = currentUserRole === "admin";
+  const navItems = isAdmin ? adminNavItems : userNavItems;
 
+  // Admin navbar - completely different UI
+  if (isAdmin) {
+    return (
+      <>
+        {/* Desktop Admin Navbar */}
+        <nav className="hidden md:flex fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-lg border-b shadow-sm">
+          <div className="container flex items-center justify-between h-16">
+            <Link to="/admin" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-hero rounded-xl flex items-center justify-center shadow-orange">
+                <Shield className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-xl text-foreground">RentMate Admin</span>
+            </Link>
+
+            <div className="flex items-center gap-4">
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link key={item.path} to={item.path}>
+                    <Button
+                      variant={isActive ? "soft" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "gap-2",
+                        isActive && "text-primary font-semibold"
+                      )}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                );
+              })}
+              
+              <Link to="/login">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <LogOut className="w-4 h-4" />
+                  Keluar
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </nav>
+
+        {/* Mobile Admin Navbar */}
+        <nav className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-lg border-b shadow-sm">
+          <div className="flex items-center justify-between h-14 px-4">
+            <Link to="/admin" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-hero rounded-lg flex items-center justify-center shadow-orange">
+                <Shield className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-lg text-foreground">Admin</span>
+            </Link>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+          </div>
+
+          {mobileMenuOpen && (
+            <div className="absolute top-14 left-0 right-0 bg-card border-b shadow-lg animate-slide-up">
+              <div className="p-4 space-y-2">
+                {adminNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <div
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                          isActive ? "bg-accent text-primary" : "hover:bg-secondary"
+                        )}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="font-medium">{item.label}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="outline" className="w-full mt-2 gap-2">
+                    <LogOut className="w-4 h-4" />
+                    Keluar
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </nav>
+      </>
+    );
+  }
+
+  // User/Talent navbar - NO admin menu visible
   return (
     <>
       {/* Desktop Navbar */}
@@ -32,7 +146,7 @@ export function Navbar() {
           </Link>
 
           <div className="flex items-center gap-1">
-            {navItems.map((item) => {
+            {userNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               return (
@@ -51,21 +165,6 @@ export function Navbar() {
                 </Link>
               );
             })}
-            {isAdmin && (
-              <Link to={adminItem.path}>
-                <Button
-                  variant={location.pathname === adminItem.path ? "soft" : "ghost"}
-                  size="sm"
-                  className={cn(
-                    "gap-2",
-                    location.pathname === adminItem.path && "text-primary font-semibold"
-                  )}
-                >
-                  <Shield className="w-4 h-4" />
-                  {adminItem.label}
-                </Button>
-              </Link>
-            )}
           </div>
 
           <Link to="/login">
@@ -99,7 +198,7 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="absolute top-14 left-0 right-0 bg-card border-b shadow-lg animate-slide-up">
             <div className="p-4 space-y-2">
-              {navItems.map((item) => {
+              {userNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
                 return (
@@ -120,21 +219,6 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              {isAdmin && (
-                <Link to={adminItem.path} onClick={() => setMobileMenuOpen(false)}>
-                  <div
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl transition-colors",
-                      location.pathname === adminItem.path
-                        ? "bg-accent text-primary"
-                        : "hover:bg-secondary"
-                    )}
-                  >
-                    <Shield className="w-5 h-5" />
-                    <span className="font-medium">{adminItem.label}</span>
-                  </div>
-                </Link>
-              )}
               <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="hero" className="w-full mt-2">
                   Masuk
@@ -148,7 +232,7 @@ export function Navbar() {
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-pb">
         <div className="flex items-center justify-around h-16 px-2">
-          {navItems.slice(0, 5).map((item) => {
+          {userNavItems.slice(0, 5).map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
             return (

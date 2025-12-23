@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RatingModal } from "@/components/RatingModal";
 import { talents } from "@/data/mockData";
 
 // Mock user data
@@ -57,6 +58,12 @@ const mockBookings = [
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState("bookings");
+  const [ratingModal, setRatingModal] = useState<{
+    isOpen: boolean;
+    talentId: string;
+    bookingId: string;
+  }>({ isOpen: false, talentId: "", bookingId: "" });
+  const [ratedBookings, setRatedBookings] = useState<string[]>([]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -105,10 +112,18 @@ export default function Profile() {
               </div>
             </div>
 
-            <Button variant="outline" className="gap-2">
-              <Edit3 className="w-4 h-4" />
-              Edit Profil
-            </Button>
+            <div className="flex flex-col md:flex-row gap-2">
+              <Button variant="outline" className="gap-2">
+                <Edit3 className="w-4 h-4" />
+                Edit Profil
+              </Button>
+              <Link to="/talent-registration">
+                <Button variant="hero" className="gap-2 w-full">
+                  <Star className="w-4 h-4" />
+                  Tingkatkan Akun Menjadi Talent
+                </Button>
+              </Link>
+            </div>
           </div>
         </Card>
 
@@ -194,11 +209,26 @@ export default function Profile() {
                         <span className="font-bold text-primary">
                           {formatPrice(booking.total)}
                         </span>
-                        {booking.status === "completed" && (
-                          <Button variant="outline" size="sm" className="gap-1">
+                        {booking.status === "completed" && !ratedBookings.includes(booking.id) && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1"
+                            onClick={() => setRatingModal({
+                              isOpen: true,
+                              talentId: booking.talentId,
+                              bookingId: booking.id,
+                            })}
+                          >
                             <Star className="w-4 h-4" />
                             Beri Rating
                           </Button>
+                        )}
+                        {booking.status === "completed" && ratedBookings.includes(booking.id) && (
+                          <Badge variant="success" className="gap-1">
+                            <Star className="w-3 h-3 fill-current" />
+                            Sudah Dinilai
+                          </Badge>
                         )}
                         {booking.status === "upcoming" && (
                           <Link to={`/chat/${booking.talentId}`}>
@@ -247,6 +277,21 @@ export default function Profile() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Rating Modal */}
+        {ratingModal.talentId && (
+          <RatingModal
+            isOpen={ratingModal.isOpen}
+            onClose={() => setRatingModal({ isOpen: false, talentId: "", bookingId: "" })}
+            talentName={talents.find((t) => t.id === ratingModal.talentId)?.name || ""}
+            talentPhoto={talents.find((t) => t.id === ratingModal.talentId)?.photo || ""}
+            bookingId={ratingModal.bookingId}
+            onSubmit={(rating, comment) => {
+              console.log("Rating submitted:", { rating, comment, bookingId: ratingModal.bookingId });
+              setRatedBookings((prev) => [...prev, ratingModal.bookingId]);
+            }}
+          />
+        )}
       </div>
     </div>
   );

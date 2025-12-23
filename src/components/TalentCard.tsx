@@ -104,8 +104,8 @@ export function TalentCard({ talent }: TalentCardProps) {
         </div>
 
         <Link to={`/talent/${talent.id}`}>
-          <Button variant="outline" className="w-full">
-            Lihat Profil
+          <Button variant="hero" className="w-full">
+            Pilih Pendamping
           </Button>
         </Link>
       </div>

@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
-import { Calendar, Clock, MapPin, MessageCircle, Star, ChevronRight } from "lucide-react";
+import { Calendar, Clock, MapPin, MessageCircle, Star, ChevronRight, Lock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { talents } from "@/data/mockData";
+
+type BookingStatus = "pending_payment" | "pending_approval" | "approved" | "completed" | "cancelled";
 
 const mockBookings = [
   {
@@ -14,7 +16,7 @@ const mockBookings = [
     time: "14:00",
     duration: 2,
     purpose: "Nongkrong / Ngobrol",
-    status: "completed",
+    status: "completed" as BookingStatus,
     total: 300000,
     type: "offline",
   },
@@ -25,7 +27,7 @@ const mockBookings = [
     time: "19:00",
     duration: 3,
     purpose: "Dinner / Makan Malam",
-    status: "upcoming",
+    status: "approved" as BookingStatus,
     total: 390000,
     type: "offline",
   },
@@ -36,9 +38,20 @@ const mockBookings = [
     time: "10:00",
     duration: 2,
     purpose: "Traveling / Liburan",
-    status: "upcoming",
+    status: "pending_approval" as BookingStatus,
     total: 280000,
     type: "offline",
+  },
+  {
+    id: "b4",
+    talentId: "2",
+    date: "2024-01-30",
+    time: "15:00",
+    duration: 2,
+    purpose: "Nongkrong / Ngobrol",
+    status: "pending_payment" as BookingStatus,
+    total: 250000,
+    type: "online",
   },
 ];
 
@@ -51,12 +64,50 @@ export default function Bookings() {
     }).format(price);
   };
 
-  const upcomingBookings = mockBookings.filter((b) => b.status === "upcoming");
+  const getStatusBadge = (status: BookingStatus) => {
+    switch (status) {
+      case "pending_payment":
+        return <Badge variant="warning">Menunggu Pembayaran</Badge>;
+      case "pending_approval":
+        return <Badge variant="accent">Menunggu Persetujuan</Badge>;
+      case "approved":
+        return <Badge variant="success">Disetujui</Badge>;
+      case "completed":
+        return <Badge variant="secondary">Selesai</Badge>;
+      case "cancelled":
+        return <Badge variant="destructive">Dibatalkan</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusLabel = (status: BookingStatus) => {
+    switch (status) {
+      case "pending_payment":
+        return "Menunggu Pembayaran";
+      case "pending_approval":
+        return "Menunggu Persetujuan Admin";
+      case "approved":
+        return "Disetujui - Percakapan Aktif";
+      case "completed":
+        return "Selesai";
+      case "cancelled":
+        return "Dibatalkan";
+      default:
+        return status;
+    }
+  };
+
+  const activeBookings = mockBookings.filter(
+    (b) => b.status === "approved" || b.status === "pending_approval" || b.status === "pending_payment"
+  );
   const completedBookings = mockBookings.filter((b) => b.status === "completed");
 
   const BookingCard = ({ booking }: { booking: (typeof mockBookings)[0] }) => {
     const talent = talents.find((t) => t.id === booking.talentId);
     if (!talent) return null;
+
+    const canChat = booking.status === "approved";
 
     return (
       <Card hover className="overflow-hidden">
@@ -75,21 +126,7 @@ export default function Bookings() {
                   {talent.city}
                 </div>
               </div>
-              <Badge
-                variant={
-                  booking.status === "completed"
-                    ? "success"
-                    : booking.status === "upcoming"
-                    ? "accent"
-                    : "secondary"
-                }
-              >
-                {booking.status === "completed"
-                  ? "Selesai"
-                  : booking.status === "upcoming"
-                  ? "Akan Datang"
-                  : "Dibatalkan"}
-              </Badge>
+              {getStatusBadge(booking.status)}
             </div>
 
             <p className="text-sm text-primary font-medium mb-2">
@@ -116,11 +153,22 @@ export default function Bookings() {
                 {formatPrice(booking.total)}
               </span>
               <div className="flex gap-2">
-                {booking.status === "upcoming" && (
-                  <Link to={`/chat/${booking.talentId}`}>
+                {booking.status === "pending_payment" && (
+                  <Button size="sm" variant="hero" className="gap-1">
+                    Bayar Sekarang
+                  </Button>
+                )}
+                {booking.status === "pending_approval" && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Lock className="w-3 h-3" />
+                    <span>Percakapan belum aktif</span>
+                  </div>
+                )}
+                {canChat && (
+                  <Link to={`/chat/${booking.id}`}>
                     <Button size="sm" variant="outline" className="gap-1">
                       <MessageCircle className="w-4 h-4" />
-                      Obrolan
+                      Percakapan
                     </Button>
                   </Link>
                 )}
@@ -149,22 +197,35 @@ export default function Bookings() {
       <div className="container max-w-3xl">
         <h1 className="text-3xl font-bold mb-6">Pemesanan Saya</h1>
 
-        <Tabs defaultValue="upcoming">
+        {/* Info Alur */}
+        <Card className="p-4 mb-6 bg-accent/30 border-primary/20">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
+            <div>
+              <p className="font-medium text-sm">Alur Pemesanan RentMate</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Pilih Pendamping → Bayar → Tunggu Persetujuan Admin → Percakapan Aktif
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Tabs defaultValue="active">
           <TabsList className="w-full grid grid-cols-2 mb-6">
-            <TabsTrigger value="upcoming" className="gap-2">
-              Akan Datang
-              {upcomingBookings.length > 0 && (
+            <TabsTrigger value="active" className="gap-2">
+              Aktif
+              {activeBookings.length > 0 && (
                 <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                  {upcomingBookings.length}
+                  {activeBookings.length}
                 </Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="completed">Selesai</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="upcoming" className="space-y-4">
-            {upcomingBookings.length > 0 ? (
-              upcomingBookings.map((booking) => (
+          <TabsContent value="active" className="space-y-4">
+            {activeBookings.length > 0 ? (
+              activeBookings.map((booking) => (
                 <BookingCard key={booking.id} booking={booking} />
               ))
             ) : (
@@ -172,10 +233,10 @@ export default function Bookings() {
                 <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-bold mb-2">Belum Ada Pemesanan</h3>
                 <p className="text-muted-foreground mb-6">
-                  Kamu belum memiliki pemesanan yang akan datang
+                  Kamu belum memiliki pemesanan yang aktif
                 </p>
                 <Link to="/talents">
-                  <Button variant="hero">Cari Pendamping</Button>
+                  <Button variant="hero">Pilih Pendamping</Button>
                 </Link>
               </Card>
             )}
@@ -191,7 +252,7 @@ export default function Bookings() {
                 <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-bold mb-2">Belum Ada Riwayat</h3>
                 <p className="text-muted-foreground">
-                  Booking yang sudah selesai akan muncul di sini
+                  Pemesanan yang sudah selesai akan muncul di sini
                 </p>
               </Card>
             )}

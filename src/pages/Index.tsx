@@ -60,7 +60,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Link to="/talents">
                   <Button variant="hero" size="xl" className="group">
-                    Mulai Sekarang
+                    Pilih Pendamping
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
@@ -250,7 +250,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/talents">
                   <Button variant="secondary" size="lg" className="text-foreground">
-                    Cari Pendamping Sekarang
+                    Pilih Pendamping Sekarang
                   </Button>
                 </Link>
                 <Link to="/login">
@@ -283,9 +283,9 @@ export default function Index() {
             <div>
               <h4 className="font-bold mb-4">Navigasi</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/talents" className="hover:text-primary transition-colors">Cari Pendamping</Link></li>
+                <li><Link to="/talents" className="hover:text-primary transition-colors">Pilih Pendamping</Link></li>
                 <li><Link to="/bookings" className="hover:text-primary transition-colors">Pemesanan Saya</Link></li>
-                <li><Link to="/chat" className="hover:text-primary transition-colors">Obrolan</Link></li>
+                <li><Link to="/chat" className="hover:text-primary transition-colors">Percakapan</Link></li>
                 <li><Link to="/profile" className="hover:text-primary transition-colors">Profil</Link></li>
               </ul>
             </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Users,
   UserCheck,
@@ -8,10 +9,12 @@ import {
   Shield,
   Ban,
   Search,
-  MoreVertical,
   Eye,
   CheckCircle,
   XCircle,
+  Clock,
+  Calendar,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,11 +22,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { talents } from "@/data/mockData";
+import { useToast } from "@/hooks/use-toast";
 
 const stats = [
   { label: "Total Pengguna", value: "10,234", icon: Users, change: "+12%" },
   { label: "Pendamping Aktif", value: "523", icon: UserCheck, change: "+8%" },
-  { label: "Total Obrolan", value: "45,678", icon: MessageSquare, change: "+23%" },
+  { label: "Total Percakapan", value: "45,678", icon: MessageSquare, change: "+23%" },
   { label: "Pendapatan", value: "Rp 125M", icon: DollarSign, change: "+15%" },
 ];
 
@@ -32,8 +36,37 @@ const pendingVerifications = [
   { id: "v2", name: "Rizky Pratama", email: "rizky@email.com", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", date: "2024-01-19" },
 ];
 
+const pendingBookings = [
+  { 
+    id: "pb1", 
+    userName: "Andi Wijaya", 
+    userPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
+    talentName: "Sarah Putri",
+    purpose: "Nongkrong / Ngobrol",
+    date: "2024-01-25",
+    time: "14:00",
+    duration: 2,
+    total: 300000,
+    status: "pending_approval"
+  },
+  { 
+    id: "pb2", 
+    userName: "Budi Santoso", 
+    userPhoto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+    talentName: "Maya Indah",
+    purpose: "Dinner / Makan Malam",
+    date: "2024-01-26",
+    time: "19:00",
+    duration: 3,
+    total: 390000,
+    status: "pending_approval"
+  },
+];
+
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [bookings, setBookings] = useState(pendingBookings);
+  const { toast } = useToast();
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -43,11 +76,62 @@ export default function Admin() {
     }).format(price);
   };
 
+  const handleApproveBooking = (bookingId: string) => {
+    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    toast({
+      title: "Pemesanan Disetujui",
+      description: "Percakapan antara pengguna dan pendamping sudah aktif",
+    });
+  };
+
+  const handleRejectBooking = (bookingId: string) => {
+    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    toast({
+      title: "Pemesanan Ditolak",
+      description: "Pengguna akan menerima notifikasi penolakan",
+      variant: "destructive",
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-8">
-      <div className="container">
+    <div className="min-h-screen bg-gradient-warm">
+      {/* Admin Header - Terpisah dari Navbar user */}
+      <div className="bg-card border-b">
+        <div className="container flex items-center justify-between h-16">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-hero rounded-xl flex items-center justify-center shadow-orange">
+              <Shield className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <span className="font-bold text-xl">RentMate Admin</span>
+              <p className="text-xs text-muted-foreground">Panel Administrasi</p>
+            </div>
+          </div>
+          <Link to="/">
+            <Button variant="outline" size="sm" className="gap-2">
+              <LogOut className="w-4 h-4" />
+              Keluar
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="container pt-8 pb-8">
         <h1 className="text-3xl font-bold mb-2">Dasbor Admin</h1>
-        <p className="text-muted-foreground mb-8">Kelola platform RentMate</p>
+        <p className="text-muted-foreground mb-8">Kelola platform RentMate - Khusus Administrator</p>
+
+        {/* Admin Notice */}
+        <Card className="p-4 mb-6 bg-primary/5 border-primary/20">
+          <div className="flex items-start gap-3">
+            <Shield className="w-5 h-5 text-primary mt-0.5" />
+            <div>
+              <p className="font-medium text-sm">Mode Admin Aktif</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sebagai admin, Anda hanya dapat mengelola platform. Admin tidak dapat memesan, membayar, atau menggunakan fitur percakapan.
+              </p>
+            </div>
+          </div>
+        </Card>
 
         {/* Stats */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -71,13 +155,89 @@ export default function Admin() {
           })}
         </div>
 
-        <Tabs defaultValue="users" className="space-y-6">
+        <Tabs defaultValue="approvals" className="space-y-6">
           <TabsList className="grid grid-cols-4 w-full max-w-xl">
+            <TabsTrigger value="approvals" className="gap-1">
+              <Clock className="w-4 h-4" />
+              Persetujuan
+              {bookings.length > 0 && (
+                <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px] ml-1">
+                  {bookings.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="users">Pengguna</TabsTrigger>
             <TabsTrigger value="verification">Verifikasi</TabsTrigger>
-            <TabsTrigger value="moderation">Moderasi</TabsTrigger>
             <TabsTrigger value="revenue">Pendapatan</TabsTrigger>
           </TabsList>
+
+          {/* Pending Approvals Tab - NEW */}
+          <TabsContent value="approvals" className="space-y-4">
+            <h2 className="text-xl font-bold">Pemesanan Menunggu Persetujuan</h2>
+            <p className="text-muted-foreground text-sm mb-4">
+              Pemesanan yang sudah dibayar dan menunggu persetujuan admin untuk mengaktifkan percakapan.
+            </p>
+            
+            {bookings.length > 0 ? (
+              bookings.map((booking) => (
+                <Card key={booking.id} className="p-4">
+                  <div className="flex items-start gap-4">
+                    <img src={booking.userPhoto} alt={booking.userName} className="w-14 h-14 rounded-full object-cover" />
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-bold">{booking.userName}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Memesan: <span className="text-foreground font-medium">{booking.talentName}</span>
+                          </p>
+                        </div>
+                        <Badge variant="accent">Menunggu Persetujuan</Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-3">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(booking.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                        </div>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          {booking.time} • {booking.duration} jam
+                        </div>
+                        <div className="text-muted-foreground">{booking.purpose}</div>
+                        <div className="font-bold text-primary">{formatPrice(booking.total)}</div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="gap-1"
+                          onClick={() => handleApproveBooking(booking.id)}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Setujui
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="gap-1"
+                          onClick={() => handleRejectBooking(booking.id)}
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Tolak
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Card className="p-8 text-center">
+                <CheckCircle className="w-16 h-16 mx-auto text-green-500 mb-4" />
+                <h3 className="text-xl font-bold mb-2">Semua Pemesanan Sudah Diproses</h3>
+                <p className="text-muted-foreground">Tidak ada pemesanan yang menunggu persetujuan</p>
+              </Card>
+            )}
+          </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
             <div className="flex gap-4 mb-4">
@@ -155,14 +315,6 @@ export default function Admin() {
                 </div>
               </Card>
             ))}
-          </TabsContent>
-
-          <TabsContent value="moderation">
-            <Card className="p-8 text-center">
-              <Shield className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-bold mb-2">Tidak Ada Laporan</h3>
-              <p className="text-muted-foreground">Semua obrolan aman dan tidak ada pelanggaran</p>
-            </Card>
           </TabsContent>
 
           <TabsContent value="revenue">

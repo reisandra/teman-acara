@@ -11,7 +11,7 @@ export default function Index() {
     {
       icon: Shield,
       title: "Keamanan Terjamin",
-      description: "Semua talent terverifikasi dan melalui proses screening ketat",
+      description: "Semua pendamping terverifikasi dan melalui proses screening ketat",
     },
     {
       icon: Lock,
@@ -27,9 +27,9 @@ export default function Index() {
 
   const stats = [
     { value: "10K+", label: "Pengguna Aktif" },
-    { value: "500+", label: "Talent Terverifikasi" },
+    { value: "500+", label: "Pendamping Terverifikasi" },
     { value: "25+", label: "Kota di Indonesia" },
-    { value: "4.8", label: "Rating Rata-rata" },
+    { value: "4.8", label: "Penilaian Rata-rata" },
   ];
 
   return (
@@ -156,13 +156,13 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Featured Talents */}
+      {/* Featured Pendamping */}
       <section className="py-16 md:py-24">
         <div className="container">
           <div className="flex items-center justify-between mb-12">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-2">
-                Talent <span className="text-gradient">Unggulan</span>
+                Pendamping <span className="text-gradient">Unggulan</span>
               </h2>
               <p className="text-muted-foreground">Temukan pendamping terbaik untuk aktivitasmu</p>
             </div>
@@ -185,7 +185,7 @@ export default function Index() {
           <div className="mt-8 text-center md:hidden">
             <Link to="/talents">
               <Button variant="outline" className="group">
-                Lihat Semua Talent
+                Lihat Semua Pendamping
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
@@ -250,7 +250,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/talents">
                   <Button variant="secondary" size="lg" className="text-foreground">
-                    Cari Talent Sekarang
+                    Cari Pendamping Sekarang
                   </Button>
                 </Link>
                 <Link to="/login">
@@ -281,11 +281,12 @@ export default function Index() {
             </div>
 
             <div>
-              <h4 className="font-bold mb-4">Layanan</h4>
+              <h4 className="font-bold mb-4">Navigasi</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/talents" className="hover:text-primary transition-colors">Cari Talent</Link></li>
-                <li><Link to="/register" className="hover:text-primary transition-colors">Jadi Talent</Link></li>
-                <li><Link to="/bookings" className="hover:text-primary transition-colors">Booking</Link></li>
+                <li><Link to="/talents" className="hover:text-primary transition-colors">Cari Pendamping</Link></li>
+                <li><Link to="/bookings" className="hover:text-primary transition-colors">Pemesanan Saya</Link></li>
+                <li><Link to="/chat" className="hover:text-primary transition-colors">Obrolan</Link></li>
+                <li><Link to="/profile" className="hover:text-primary transition-colors">Profil</Link></li>
               </ul>
             </div>
 

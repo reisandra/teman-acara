@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { MapPin, Star, Clock, BadgeCheck } from "lucide-react";
+import { MapPin, Star, Clock, BadgeCheck, User } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,23 @@ interface TalentCardProps {
   talent: Talent;
 }
 
+// Validasi data pendamping
+const isValidTalent = (talent: Talent): boolean => {
+  return !!(
+    talent.id &&
+    talent.name &&
+    talent.name.trim() !== "" &&
+    talent.photo &&
+    talent.photo.trim() !== "" &&
+    talent.city &&
+    talent.age >= 18 &&
+    talent.age <= 40
+  );
+};
+
 export function TalentCard({ talent }: TalentCardProps) {
+  const [imageError, setImageError] = useState(false);
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -18,14 +35,26 @@ export function TalentCard({ talent }: TalentCardProps) {
     }).format(price);
   };
 
+  // Jangan render kartu jika data tidak valid
+  if (!isValidTalent(talent)) {
+    return null;
+  }
+
   return (
     <Card hover className="overflow-hidden group">
       <div className="relative">
-        <img
-          src={talent.photo}
-          alt={talent.name}
-          className="w-full aspect-[4/5] object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+        {imageError ? (
+          <div className="w-full aspect-[4/5] bg-muted flex items-center justify-center">
+            <User className="w-16 h-16 text-muted-foreground" />
+          </div>
+        ) : (
+          <img
+            src={talent.photo}
+            alt={talent.name}
+            className="w-full aspect-[4/5] object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => setImageError(true)}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-transparent to-transparent" />
         
         {talent.verified && (

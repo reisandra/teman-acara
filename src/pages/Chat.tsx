@@ -104,12 +104,12 @@ export default function Chat() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
             <Info className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h2 className="text-2xl font-bold mb-2">Chat Tidak Ditemukan</h2>
+          <h2 className="text-2xl font-bold mb-2">Obrolan Tidak Ditemukan</h2>
           <p className="text-muted-foreground mb-6">
-            Chat hanya tersedia setelah booking berhasil dikonfirmasi
+            Obrolan hanya tersedia setelah pemesanan berhasil dikonfirmasi
           </p>
           <Link to="/talents">
-            <Button variant="hero">Cari Talent</Button>
+            <Button variant="hero">Cari Pendamping</Button>
           </Link>
         </Card>
       </div>
@@ -177,7 +177,7 @@ export default function Chat() {
       {/* Booking Details Expandable */}
       {showBookingInfo && (
         <div className="flex-shrink-0 bg-card border-b p-4 animate-fade-in">
-          <h4 className="font-semibold mb-3">Detail Booking</h4>
+          <h4 className="font-semibold mb-3">Detail Pemesanan</h4>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-primary" />
@@ -210,7 +210,7 @@ export default function Chat() {
         {/* System Message */}
         <div className="flex justify-center">
           <div className="bg-primary/10 text-primary text-xs px-4 py-2 rounded-full max-w-xs text-center">
-            🎉 Booking dikonfirmasi! Silakan koordinasi dengan {talent.name}
+            🎉 Pemesanan dikonfirmasi! Silakan koordinasi dengan {talent.name}
           </div>
         </div>
 

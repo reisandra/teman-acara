@@ -32,7 +32,7 @@ export function TalentCard({ talent }: TalentCardProps) {
           <div className="absolute top-3 right-3">
             <Badge variant="default" className="gap-1">
               <BadgeCheck className="w-3 h-3" />
-              Verified
+              Terverifikasi
             </Badge>
           </div>
         )}
@@ -76,7 +76,7 @@ export function TalentCard({ talent }: TalentCardProps) {
 
         <Link to={`/talent/${talent.id}`}>
           <Button variant="outline" className="w-full">
-            Lihat Detail
+            Lihat Profil
           </Button>
         </Link>
       </div>

@@ -15,19 +15,28 @@ import {
   HelpCircle,
   FileText,
   Bell,
+  X,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RatingModal } from "@/components/RatingModal";
 import { talents } from "@/data/mockData";
+import { useToast } from "@/hooks/use-toast";
 
 // Mock user data
-const mockUser = {
+const initialUserData = {
   name: "Budi Santoso",
+  username: "budisantoso",
   email: "budi@email.com",
   phone: "+62 812 3456 7890",
+  bio: "Suka traveling dan ngobrol santai",
+  city: "Jakarta",
+  hobbies: "Traveling, Fotografi, Kuliner",
+  preference: "offline" as "online" | "offline" | "both",
   photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face",
   joinDate: "Januari 2024",
   wallet: 500000,
@@ -57,7 +66,11 @@ const mockBookings = [
 ];
 
 export default function Profile() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("bookings");
+  const [isEditing, setIsEditing] = useState(false);
+  const [userData, setUserData] = useState(initialUserData);
+  const [editData, setEditData] = useState(initialUserData);
   const [ratingModal, setRatingModal] = useState<{
     isOpen: boolean;
     talentId: string;
@@ -71,6 +84,25 @@ export default function Profile() {
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(price);
+  };
+
+  const handleEditClick = () => {
+    setEditData(userData);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditData(userData);
+    setIsEditing(false);
+  };
+
+  const handleSaveProfile = () => {
+    setUserData(editData);
+    setIsEditing(false);
+    toast({
+      title: "Profil berhasil diperbarui",
+      description: "Perubahan telah disimpan",
+    });
   };
 
   const menuItems = [
@@ -88,42 +120,160 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="relative">
               <img
-                src={mockUser.photo}
-                alt={mockUser.name}
+                src={userData.photo}
+                alt={userData.name}
                 className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover ring-4 ring-primary/20"
               />
-              <button className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-orange">
-                <Camera className="w-4 h-4" />
-              </button>
+              {isEditing && (
+                <button className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-orange">
+                  <Camera className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
-            <div className="flex-1 text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                <h1 className="text-2xl font-bold">{mockUser.name}</h1>
-                <Badge variant="secondary" className="gap-1">
-                  <User className="w-3 h-3" />
-                  User
-                </Badge>
-              </div>
-              <p className="text-muted-foreground mb-2">{mockUser.email}</p>
-              <div className="flex flex-wrap justify-center md:justify-start gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  Jakarta, Indonesia
+            {!isEditing ? (
+              <>
+                <div className="flex-1 text-center md:text-left">
+                  <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                    <h1 className="text-2xl font-bold">{userData.name}</h1>
+                    <Badge variant="secondary" className="gap-1">
+                      <User className="w-3 h-3" />
+                      Pengguna
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground mb-1">@{userData.username}</p>
+                  <p className="text-sm text-muted-foreground mb-2">{userData.bio}</p>
+                  <div className="flex flex-wrap justify-center md:justify-start gap-3 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {userData.city}, Indonesia
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      Bergabung {userData.joinDate}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  Bergabung {mockUser.joinDate}
-                </div>
-              </div>
-            </div>
 
-            <div className="flex flex-col md:flex-row gap-2">
-              <Button variant="outline" className="gap-2">
-                <Edit3 className="w-4 h-4" />
-                Edit Profil
-              </Button>
-            </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                  <Button variant="outline" className="gap-2" onClick={handleEditClick}>
+                    <Edit3 className="w-4 h-4" />
+                    Edit Profil
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 w-full">
+                <div className="grid gap-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Nama Lengkap</label>
+                      <Input
+                        value={editData.name}
+                        onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                        placeholder="Nama lengkap"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Username</label>
+                      <Input
+                        value={editData.username}
+                        onChange={(e) => setEditData({ ...editData, username: e.target.value })}
+                        placeholder="Username"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Bio Singkat</label>
+                    <Input
+                      value={editData.bio}
+                      onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                      placeholder="Ceritakan tentang dirimu"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Kota</label>
+                      <Input
+                        value={editData.city}
+                        onChange={(e) => setEditData({ ...editData, city: e.target.value })}
+                        placeholder="Kota"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Hobi</label>
+                      <Input
+                        value={editData.hobbies}
+                        onChange={(e) => setEditData({ ...editData, hobbies: e.target.value })}
+                        placeholder="Hobi (pisahkan dengan koma)"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Nomor Kontak (opsional)</label>
+                    <Input
+                      value={editData.phone}
+                      onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                      placeholder="Nomor telepon"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Preferensi Pertemuan</label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: "online", label: "Online" },
+                        { value: "offline", label: "Offline" },
+                        { value: "both", label: "Keduanya" },
+                      ].map((option) => (
+                        <Button
+                          key={option.value}
+                          variant={editData.preference === option.value ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            setEditData({ ...editData, preference: option.value as "online" | "offline" | "both" })
+                          }
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Non-editable fields */}
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-2">Informasi yang tidak dapat diubah:</p>
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Email: </span>
+                        <span className="font-medium">{userData.email}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Role: </span>
+                        <Badge variant="secondary" className="gap-1">
+                          <User className="w-3 h-3" />
+                          Pengguna
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="hero" className="flex-1 gap-2" onClick={handleSaveProfile}>
+                      <Save className="w-4 h-4" />
+                      Simpan Perubahan
+                    </Button>
+                    <Button variant="outline" className="gap-2" onClick={handleCancelEdit}>
+                      <X className="w-4 h-4" />
+                      Batal
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -135,12 +285,12 @@ export default function Profile() {
                 <Wallet className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm opacity-80">Saldo Wallet</p>
-                <p className="text-2xl font-bold">{formatPrice(mockUser.wallet)}</p>
+                <p className="text-sm opacity-80">Saldo Dompet</p>
+                <p className="text-2xl font-bold">{formatPrice(userData.wallet)}</p>
               </div>
             </div>
             <Button variant="secondary" className="text-foreground">
-              Top Up
+              Isi Saldo
             </Button>
           </div>
         </Card>
@@ -148,7 +298,7 @@ export default function Profile() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full grid grid-cols-2 mb-6">
-            <TabsTrigger value="bookings">Riwayat Booking</TabsTrigger>
+            <TabsTrigger value="bookings">Riwayat Pemesanan</TabsTrigger>
             <TabsTrigger value="settings">Pengaturan</TabsTrigger>
           </TabsList>
 
@@ -221,7 +371,7 @@ export default function Profile() {
                             })}
                           >
                             <Star className="w-4 h-4" />
-                            Beri Rating
+                            Beri Penilaian
                           </Button>
                         )}
                         {booking.status === "completed" && ratedBookings.includes(booking.id) && (
@@ -232,7 +382,7 @@ export default function Profile() {
                         )}
                         {booking.status === "upcoming" && (
                           <Link to={`/chat/${booking.talentId}`}>
-                            <Button size="sm">Chat</Button>
+                            <Button size="sm">Obrolan</Button>
                           </Link>
                         )}
                       </div>

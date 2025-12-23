@@ -120,14 +120,14 @@ export default function Bookings() {
                   <Link to={`/chat/${booking.talentId}`}>
                     <Button size="sm" variant="outline" className="gap-1">
                       <MessageCircle className="w-4 h-4" />
-                      Chat
+                      Obrolan
                     </Button>
                   </Link>
                 )}
                 {booking.status === "completed" && (
                   <Button size="sm" variant="outline" className="gap-1">
                     <Star className="w-4 h-4" />
-                    Rating
+                    Beri Ulasan
                   </Button>
                 )}
                 <Link to={`/talent/${booking.talentId}`}>
@@ -147,7 +147,7 @@ export default function Bookings() {
   return (
     <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-24 md:pb-8">
       <div className="container max-w-3xl">
-        <h1 className="text-3xl font-bold mb-6">Booking Saya</h1>
+        <h1 className="text-3xl font-bold mb-6">Pemesanan Saya</h1>
 
         <Tabs defaultValue="upcoming">
           <TabsList className="w-full grid grid-cols-2 mb-6">
@@ -168,14 +168,14 @@ export default function Bookings() {
                 <BookingCard key={booking.id} booking={booking} />
               ))
             ) : (
-              <Card className="p-12 text-center">
+                <Card className="p-12 text-center">
                 <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-xl font-bold mb-2">Belum Ada Booking</h3>
+                <h3 className="text-xl font-bold mb-2">Belum Ada Pemesanan</h3>
                 <p className="text-muted-foreground mb-6">
-                  Kamu belum memiliki booking yang akan datang
+                  Kamu belum memiliki pemesanan yang akan datang
                 </p>
                 <Link to="/talents">
-                  <Button variant="hero">Cari Talent</Button>
+                  <Button variant="hero">Cari Pendamping</Button>
                 </Link>
               </Card>
             )}

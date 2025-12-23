@@ -103,10 +103,10 @@ export default function Talents() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
-            Temukan <span className="text-gradient">Talent</span>
+            Temukan <span className="text-gradient">Pendamping</span>
           </h1>
           <p className="text-muted-foreground">
-            {filteredTalents.length} talent tersedia untuk menemani kamu
+            {filteredTalents.length} pendamping tersedia untuk menemani kamu
           </p>
         </div>
 
@@ -143,10 +143,10 @@ export default function Talents() {
                 <SelectValue placeholder="Urutkan" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="rating">Rating Tertinggi</SelectItem>
+                <SelectItem value="rating">Penilaian Tertinggi</SelectItem>
                 <SelectItem value="price-low">Harga Terendah</SelectItem>
                 <SelectItem value="price-high">Harga Tertinggi</SelectItem>
-                <SelectItem value="reviews">Review Terbanyak</SelectItem>
+                <SelectItem value="reviews">Ulasan Terbanyak</SelectItem>
               </SelectContent>
             </Select>
           </div>

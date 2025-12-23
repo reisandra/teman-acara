@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Beranda", path: "/", icon: Home },
-  { label: "Talent", path: "/talents", icon: Users },
-  { label: "Booking", path: "/bookings", icon: Calendar },
-  { label: "Chat", path: "/chat", icon: MessageCircle },
+  { label: "Pendamping", path: "/talents", icon: Users },
+  { label: "Pemesanan", path: "/bookings", icon: Calendar },
+  { label: "Obrolan", path: "/chat", icon: MessageCircle },
   { label: "Profil", path: "/profile", icon: User },
 ];
 

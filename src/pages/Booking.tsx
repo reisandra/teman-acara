@@ -38,9 +38,9 @@ export default function Booking() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Talent tidak ditemukan</h2>
+          <h2 className="text-2xl font-bold mb-4">Pendamping tidak ditemukan</h2>
           <Link to="/talents">
-            <Button>Kembali ke Daftar Talent</Button>
+            <Button>Kembali ke Daftar Pendamping</Button>
           </Link>
         </div>
       </div>
@@ -74,8 +74,8 @@ export default function Booking() {
     const newBookingId = `booking-${Date.now()}`;
     
     toast({
-      title: "Booking Berhasil! 🎉",
-      description: "Kamu akan diarahkan ke halaman chat dengan talent",
+      title: "Pemesanan Berhasil! 🎉",
+      description: "Kamu akan diarahkan ke halaman obrolan dengan pendamping",
     });
     
     // Navigate to chat with booking ID
@@ -117,8 +117,8 @@ export default function Booking() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Booking Talent</h1>
-            <p className="text-muted-foreground">Lengkapi detail booking kamu</p>
+            <h1 className="text-2xl font-bold">Pesan Pendamping</h1>
+            <p className="text-muted-foreground">Lengkapi detail pemesanan kamu</p>
           </div>
         </div>
 
@@ -154,7 +154,7 @@ export default function Booking() {
             <Card className="p-6">
               {step === 1 && (
                 <div className="space-y-6 animate-fade-in">
-                  <h2 className="text-xl font-bold">Detail Booking</h2>
+                  <h2 className="text-xl font-bold">Detail Pemesanan</h2>
 
                   {/* Duration */}
                   <div>
@@ -180,7 +180,7 @@ export default function Booking() {
                   {/* Purpose */}
                   <div>
                     <label className="text-sm font-medium mb-3 block">
-                      Tujuan Booking
+                      Tujuan Pemesanan
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {bookingPurposes.map((purpose) => (

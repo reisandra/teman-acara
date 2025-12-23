@@ -22,8 +22,8 @@ import { talents } from "@/data/mockData";
 
 const stats = [
   { label: "Total Pengguna", value: "10,234", icon: Users, change: "+12%" },
-  { label: "Talent Aktif", value: "523", icon: UserCheck, change: "+8%" },
-  { label: "Total Chat", value: "45,678", icon: MessageSquare, change: "+23%" },
+  { label: "Pendamping Aktif", value: "523", icon: UserCheck, change: "+8%" },
+  { label: "Total Obrolan", value: "45,678", icon: MessageSquare, change: "+23%" },
   { label: "Pendapatan", value: "Rp 125M", icon: DollarSign, change: "+15%" },
 ];
 
@@ -46,7 +46,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-8">
       <div className="container">
-        <h1 className="text-3xl font-bold mb-2">Dashboard Admin</h1>
+        <h1 className="text-3xl font-bold mb-2">Dasbor Admin</h1>
         <p className="text-muted-foreground mb-8">Kelola platform RentMate</p>
 
         {/* Stats */}
@@ -84,7 +84,7 @@ export default function Admin() {
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
-                  placeholder="Cari pengguna atau talent..."
+                  placeholder="Cari pengguna atau pendamping..."
                   className="pl-12"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -97,9 +97,9 @@ export default function Admin() {
                 <table className="w-full">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="text-left p-4 font-semibold">Talent</th>
+                      <th className="text-left p-4 font-semibold">Pendamping</th>
                       <th className="text-left p-4 font-semibold">Kota</th>
-                      <th className="text-left p-4 font-semibold">Rating</th>
+                      <th className="text-left p-4 font-semibold">Penilaian</th>
                       <th className="text-left p-4 font-semibold">Harga</th>
                       <th className="text-left p-4 font-semibold">Status</th>
                       <th className="text-left p-4 font-semibold">Aksi</th>
@@ -122,7 +122,7 @@ export default function Admin() {
                         <td className="p-4">{formatPrice(talent.pricePerHour)}</td>
                         <td className="p-4">
                           <Badge variant={talent.verified ? "success" : "warning"}>
-                            {talent.verified ? "Verified" : "Pending"}
+                            {talent.verified ? "Terverifikasi" : "Menunggu"}
                           </Badge>
                         </td>
                         <td className="p-4">
@@ -161,7 +161,7 @@ export default function Admin() {
             <Card className="p-8 text-center">
               <Shield className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-xl font-bold mb-2">Tidak Ada Laporan</h3>
-              <p className="text-muted-foreground">Semua chat aman dan tidak ada pelanggaran</p>
+              <p className="text-muted-foreground">Semua obrolan aman dan tidak ada pelanggaran</p>
             </Card>
           </TabsContent>
 

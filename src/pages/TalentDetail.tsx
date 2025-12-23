@@ -30,9 +30,9 @@ export default function TalentDetail() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Talent tidak ditemukan</h2>
+          <h2 className="text-2xl font-bold mb-4">Pendamping tidak ditemukan</h2>
           <Link to="/talents">
-            <Button>Kembali ke Daftar Talent</Button>
+            <Button>Kembali ke Daftar Pendamping</Button>
           </Link>
         </div>
       </div>
@@ -202,7 +202,7 @@ export default function TalentDetail() {
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                   <span className="font-semibold">{talent.rating}</span>
                   <span className="text-muted-foreground">
-                    ({talent.reviewCount} review)
+                    ({talent.reviewCount} ulasan)
                   </span>
                 </div>
               </div>
@@ -221,14 +221,14 @@ export default function TalentDetail() {
                   </div>
                 </div>
                 <Badge variant={talent.availability === "online" ? "accent" : talent.availability === "offline" ? "secondary" : "success"} className="text-sm px-4 py-2">
-                  {talent.availability === "online" ? "Online Only" : talent.availability === "offline" ? "Offline Only" : "Online & Offline"}
+                  {talent.availability === "online" ? "Hanya Online" : talent.availability === "offline" ? "Hanya Offline" : "Online & Offline"}
                 </Badge>
               </div>
             </Card>
 
             {/* Skills */}
             <div>
-              <h3 className="font-semibold mb-3">Skill & Hobi</h3>
+              <h3 className="font-semibold mb-3">Keahlian & Hobi</h3>
               <div className="flex flex-wrap gap-2">
                 {talent.skills.map((skill) => (
                   <Badge key={skill} variant="secondary" className="px-4 py-2">
@@ -267,17 +267,17 @@ export default function TalentDetail() {
             <div className="hidden md:block">
               <Link to={`/booking/${talent.id}`}>
                 <Button variant="hero" size="xl" className="w-full">
-                  Booking Sekarang
+                  Pesan Sekarang
                 </Button>
               </Link>
             </div>
           </div>
         </div>
 
-        {/* Reviews */}
+        {/* Ulasan */}
         <div className="mt-12">
           <h2 className="text-2xl font-bold mb-6">
-            Review ({talentReviews.length})
+            Ulasan ({talentReviews.length})
           </h2>
           {talentReviews.length > 0 ? (
             <div className="grid md:grid-cols-2 gap-4">
@@ -311,7 +311,7 @@ export default function TalentDetail() {
           ) : (
             <Card className="p-8 text-center">
               <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">Belum ada review</p>
+              <p className="text-muted-foreground">Belum ada ulasan</p>
             </Card>
           )}
         </div>
@@ -329,7 +329,7 @@ export default function TalentDetail() {
           </div>
           <Link to={`/booking/${talent.id}`}>
             <Button variant="hero" size="lg">
-              Booking Sekarang
+              Pesan Sekarang
             </Button>
           </Link>
         </div>

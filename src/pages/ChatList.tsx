@@ -46,7 +46,7 @@ export default function ChatList() {
   return (
     <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-24 md:pb-8">
       <div className="container max-w-2xl">
-        <h1 className="text-3xl font-bold mb-6">Chat</h1>
+        <h1 className="text-3xl font-bold mb-6">Obrolan</h1>
 
         {/* Search */}
         <div className="relative mb-6">
@@ -118,16 +118,16 @@ export default function ChatList() {
               <MessageCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <h3 className="text-xl font-bold mb-2">
-              {searchQuery ? "Tidak Ditemukan" : "Belum Ada Chat"}
+              {searchQuery ? "Tidak Ditemukan" : "Belum Ada Obrolan"}
             </h3>
             <p className="text-muted-foreground mb-6">
               {searchQuery 
-                ? "Coba kata kunci lain atau cari talent baru"
-                : "Chat akan muncul setelah kamu melakukan booking dengan talent"}
+                ? "Coba kata kunci lain atau cari pendamping baru"
+                : "Obrolan akan muncul setelah kamu melakukan pemesanan dengan pendamping"}
             </p>
             <Link to="/talents">
               <button className="text-primary font-semibold hover:underline">
-                Cari Talent Sekarang
+                Cari Pendamping Sekarang
               </button>
             </Link>
           </Card>

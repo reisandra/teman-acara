@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
 import {
   Users,
   UserCheck,
@@ -83,9 +82,27 @@ const pendingBookings = [
 ];
 
 export default function Admin() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [bookings, setBookings] = useState(pendingBookings);
   const { toast } = useToast();
+
+  // Check admin authentication
+  useEffect(() => {
+    const isAdminAuthenticated = sessionStorage.getItem("adminAuthenticated");
+    if (!isAdminAuthenticated) {
+      navigate("/admin-login");
+    }
+  }, [navigate]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("adminAuthenticated");
+    toast({
+      title: "Logout Berhasil",
+      description: "Anda telah keluar dari Admin Dashboard",
+    });
+    navigate("/admin-login");
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -126,12 +143,10 @@ export default function Admin() {
               <p className="text-xs text-muted-foreground">Panel Administrasi</p>
             </div>
           </div>
-          <Link to="/">
-            <Button variant="outline" size="sm" className="gap-2">
-              <LogOut className="w-4 h-4" />
-              Keluar
-            </Button>
-          </Link>
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleLogout}>
+            <LogOut className="w-4 h-4" />
+            Keluar
+          </Button>
         </div>
       </div>
 

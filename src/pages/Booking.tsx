@@ -9,6 +9,8 @@ import {
   Calendar,
   CreditCard,
   CheckCircle2,
+  Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +20,8 @@ import { talents, bookingPurposes } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+type BookingStatus = "draft" | "pending_payment" | "pending_approval" | "approved" | "rejected";
+
 export default function Booking() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -25,6 +29,8 @@ export default function Booking() {
   const talent = talents.find((t) => t.id === id);
 
   const [step, setStep] = useState(1);
+  const [bookingStatus, setBookingStatus] = useState<BookingStatus>("draft");
+  const [isProcessing, setIsProcessing] = useState(false);
   const [bookingData, setBookingData] = useState({
     duration: 2,
     purpose: "",
@@ -69,29 +75,51 @@ export default function Booking() {
     }
   };
 
-  const handleConfirm = () => {
-    // Create a new booking ID
-    const newBookingId = `booking-${Date.now()}`;
+  const handlePayment = () => {
+    setBookingStatus("pending_payment");
+    setIsProcessing(true);
     
-    toast({
-      title: "Pemesanan Berhasil! 🎉",
-      description: "Kamu akan diarahkan ke halaman obrolan dengan pendamping",
-    });
-    
-    // Navigate to chat with booking ID
+    // Simulasi pembayaran (2 detik)
     setTimeout(() => {
-      navigate(`/chat/${newBookingId}`, { 
-        state: { 
-          talentId: talent.id,
-          booking: {
-            id: newBookingId,
-            ...bookingData,
-            talentId: talent.id,
-            totalPrice: totalPrice,
-            status: "active",
-          }
-        } 
+      setIsProcessing(false);
+      setBookingStatus("pending_approval");
+      toast({
+        title: "Pembayaran Berhasil!",
+        description: "Menunggu persetujuan admin untuk mengaktifkan percakapan",
       });
+    }, 2000);
+  };
+
+  const handleAdminApproval = () => {
+    setIsProcessing(true);
+    
+    // Simulasi approval admin (1.5 detik)
+    setTimeout(() => {
+      setIsProcessing(false);
+      setBookingStatus("approved");
+      
+      const newBookingId = `booking-${Date.now()}`;
+      
+      toast({
+        title: "Pemesanan Disetujui! 🎉",
+        description: "Percakapan dengan pendamping sudah aktif",
+      });
+      
+      // Navigate to chat after approval
+      setTimeout(() => {
+        navigate(`/chat/${newBookingId}`, { 
+          state: { 
+            talentId: talent.id,
+            booking: {
+              id: newBookingId,
+              ...bookingData,
+              talentId: talent.id,
+              totalPrice: totalPrice,
+              status: "active",
+            }
+          } 
+        });
+      }, 1500);
     }, 1500);
   };
 
@@ -108,6 +136,21 @@ export default function Booking() {
     }
   };
 
+  const getStatusBadge = () => {
+    switch (bookingStatus) {
+      case "pending_payment":
+        return <Badge variant="warning">Menunggu Pembayaran</Badge>;
+      case "pending_approval":
+        return <Badge variant="accent">Menunggu Persetujuan Admin</Badge>;
+      case "approved":
+        return <Badge variant="success">Disetujui</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">Ditolak</Badge>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-warm pt-16 md:pt-24 pb-8">
       <div className="container max-w-4xl">
@@ -116,31 +159,49 @@ export default function Booking() {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">Pesan Pendamping</h1>
             <p className="text-muted-foreground">Lengkapi detail pemesanan kamu</p>
           </div>
+          {getStatusBadge()}
         </div>
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center mb-8">
-          {[1, 2, 3].map((s, i) => (
-            <div key={s} className="flex items-center">
-              <div
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all",
-                  step >= s
-                    ? "bg-primary text-primary-foreground shadow-orange"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {step > s ? <CheckCircle2 className="w-5 h-5" /> : s}
-              </div>
-              {i < 2 && (
+          {[
+            { num: 1, label: "Detail" },
+            { num: 2, label: "Jadwal" },
+            { num: 3, label: "Bayar" },
+            { num: 4, label: "Approval" },
+          ].map((s, i) => (
+            <div key={s.num} className="flex items-center">
+              <div className="flex flex-col items-center">
                 <div
                   className={cn(
-                    "w-16 md:w-24 h-1 mx-2 rounded-full transition-all",
-                    step > s ? "bg-primary" : "bg-muted"
+                    "w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all",
+                    step >= s.num || (s.num === 4 && bookingStatus === "pending_approval")
+                      ? "bg-primary text-primary-foreground shadow-orange"
+                      : "bg-muted text-muted-foreground",
+                    bookingStatus === "approved" && s.num === 4 && "bg-green-500"
+                  )}
+                >
+                  {(step > s.num || (s.num === 4 && bookingStatus === "approved")) ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : s.num === 4 && bookingStatus === "pending_approval" ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    s.num
+                  )}
+                </div>
+                <span className="text-xs mt-1 text-muted-foreground">{s.label}</span>
+              </div>
+              {i < 3 && (
+                <div
+                  className={cn(
+                    "w-12 md:w-20 h-1 mx-2 rounded-full transition-all",
+                    step > s.num || (s.num === 3 && bookingStatus !== "draft") 
+                      ? "bg-primary" 
+                      : "bg-muted"
                   )}
                 />
               )}
@@ -152,7 +213,7 @@ export default function Booking() {
           {/* Form Section */}
           <div className="md:col-span-2">
             <Card className="p-6">
-              {step === 1 && (
+              {step === 1 && bookingStatus === "draft" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Detail Pemesanan</h2>
 
@@ -246,7 +307,7 @@ export default function Booking() {
                 </div>
               )}
 
-              {step === 2 && (
+              {step === 2 && bookingStatus === "draft" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Jadwal & Waktu</h2>
 
@@ -303,7 +364,7 @@ export default function Booking() {
                 </div>
               )}
 
-              {step === 3 && (
+              {step === 3 && bookingStatus === "draft" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Konfirmasi & Pembayaran</h2>
 
@@ -357,32 +418,114 @@ export default function Booking() {
                 </div>
               )}
 
+              {/* Pending Payment State */}
+              {bookingStatus === "pending_payment" && (
+                <div className="py-12 text-center animate-fade-in">
+                  <Loader2 className="w-16 h-16 mx-auto text-primary animate-spin mb-4" />
+                  <h2 className="text-xl font-bold mb-2">Memproses Pembayaran...</h2>
+                  <p className="text-muted-foreground">Mohon tunggu sebentar</p>
+                </div>
+              )}
+
+              {/* Pending Approval State */}
+              {bookingStatus === "pending_approval" && (
+                <div className="py-8 text-center animate-fade-in">
+                  <div className="w-20 h-20 mx-auto bg-accent rounded-full flex items-center justify-center mb-4">
+                    <ShieldCheck className="w-10 h-10 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-bold mb-2">Menunggu Persetujuan Admin</h2>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Pembayaran berhasil! Pemesanan kamu sedang ditinjau oleh admin. 
+                    Percakapan akan aktif setelah disetujui.
+                  </p>
+                  
+                  <Card className="p-4 bg-muted/50 max-w-sm mx-auto mb-6">
+                    <div className="flex items-center gap-3 text-left">
+                      <img
+                        src={talent.photo}
+                        alt={talent.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <div>
+                        <p className="font-semibold">{talent.name}</p>
+                        <p className="text-sm text-muted-foreground">{bookingData.purpose}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Simulasi button untuk demo */}
+                  <div className="border-t pt-6">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      (Simulasi UI: Klik untuk menyetujui pemesanan)
+                    </p>
+                    <Button 
+                      variant="hero" 
+                      onClick={handleAdminApproval}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Menyetujui...
+                        </>
+                      ) : (
+                        "Setujui Pemesanan (Admin)"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Approved State */}
+              {bookingStatus === "approved" && (
+                <div className="py-12 text-center animate-fade-in">
+                  <div className="w-20 h-20 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-10 h-10 text-green-500" />
+                  </div>
+                  <h2 className="text-xl font-bold mb-2">Pemesanan Disetujui!</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Mengalihkan ke percakapan dengan {talent.name}...
+                  </p>
+                  <Loader2 className="w-6 h-6 mx-auto text-primary animate-spin" />
+                </div>
+              )}
+
               {/* Navigation Buttons */}
-              <div className="flex gap-3 mt-8">
-                {step > 1 && (
-                  <Button variant="outline" onClick={handleBack} className="flex-1">
-                    Kembali
-                  </Button>
-                )}
-                {step < 3 ? (
-                  <Button
-                    variant="hero"
-                    onClick={handleNext}
-                    disabled={!isStepValid()}
-                    className="flex-1"
-                  >
-                    Lanjutkan
-                  </Button>
-                ) : (
-                  <Button
-                    variant="hero"
-                    onClick={handleConfirm}
-                    className="flex-1"
-                  >
-                    Bayar & Konfirmasi
-                  </Button>
-                )}
-              </div>
+              {bookingStatus === "draft" && (
+                <div className="flex gap-3 mt-8">
+                  {step > 1 && (
+                    <Button variant="outline" onClick={handleBack} className="flex-1">
+                      Kembali
+                    </Button>
+                  )}
+                  {step < 3 ? (
+                    <Button
+                      variant="hero"
+                      onClick={handleNext}
+                      disabled={!isStepValid()}
+                      className="flex-1"
+                    >
+                      Lanjutkan
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="hero"
+                      onClick={handlePayment}
+                      disabled={isProcessing}
+                      className="flex-1"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Memproses...
+                        </>
+                      ) : (
+                        "Bayar Sekarang"
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
 
@@ -426,6 +569,18 @@ export default function Booking() {
                   <span>Total</span>
                   <span className="text-primary">{formatPrice(totalPrice)}</span>
                 </div>
+              </div>
+
+              {/* Alur Pemesanan Info */}
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-xs font-medium mb-2">Alur Pemesanan:</p>
+                <ol className="text-xs text-muted-foreground space-y-1">
+                  <li className={cn(step >= 1 && "text-primary")}>1. Pilih detail</li>
+                  <li className={cn(step >= 2 && "text-primary")}>2. Atur jadwal</li>
+                  <li className={cn(step >= 3 && "text-primary")}>3. Bayar</li>
+                  <li className={cn(bookingStatus === "pending_approval" && "text-primary")}>4. Tunggu approval admin</li>
+                  <li className={cn(bookingStatus === "approved" && "text-primary")}>5. Percakapan aktif</li>
+                </ol>
               </div>
             </Card>
           </div>

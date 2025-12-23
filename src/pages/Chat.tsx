@@ -106,6 +106,10 @@ export default function Chat() {
     }, 2500);
   };
 
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("id-ID", {
@@ -252,6 +256,7 @@ export default function Chat() {
                 : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face"
             }
             senderName={message.senderType === "talent" ? talent.name : "Kamu"}
+            onDelete={handleDeleteMessage}
           />
         ))}
 

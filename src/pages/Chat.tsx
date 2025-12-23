@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Send,
@@ -9,19 +9,35 @@ import {
   Phone,
   Video,
   Info,
+  Calendar,
+  Clock,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { ChatBubble } from "@/components/ChatBubble";
-import { talents, mockChats } from "@/data/mockData";
-import type { ChatMessage } from "@/data/mockData";
+import { talents, mockChatRooms, mockBookings } from "@/data/mockData";
+import type { ChatMessage, Booking } from "@/data/mockData";
 
 export default function Chat() {
-  const { talentId } = useParams();
-  const talent = talents.find((t) => t.id === talentId);
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChats);
+  const { bookingId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if this is a new booking from navigation state
+  const stateBooking = location.state?.booking as Booking | undefined;
+  const stateTalentId = location.state?.talentId as string | undefined;
+  
+  // Find the chat room by booking ID or use state data
+  const chatRoom = mockChatRooms.find((c) => c.bookingId === bookingId);
+  const booking = stateBooking || mockBookings.find((b) => b.id === bookingId);
+  const talent = talents.find((t) => t.id === (stateTalentId || chatRoom?.talentId || booking?.talentId));
+  
+  const [messages, setMessages] = useState<ChatMessage[]>(chatRoom?.messages || []);
   const [newMessage, setNewMessage] = useState("");
+  const [showBookingInfo, setShowBookingInfo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -49,11 +65,17 @@ export default function Chat() {
 
     // Simulate talent response
     setTimeout(() => {
+      const responses = [
+        "Terima kasih pesannya! Aku akan segera merespon ya 😊",
+        "Oke siap! Ada yang bisa aku bantu lagi?",
+        "Noted! Sampai ketemu nanti ya 👋",
+        "Baik, terima kasih infonya!",
+      ];
       const response: ChatMessage = {
         id: `m${Date.now() + 1}`,
-        senderId: talentId || "1",
+        senderId: talent?.id || "1",
         senderType: "talent",
-        message: "Terima kasih pesannya! Aku akan segera merespon ya 😊",
+        message: responses[Math.floor(Math.random() * responses.length)],
         timestamp: new Date().toISOString(),
         status: "delivered",
       };
@@ -71,18 +93,30 @@ export default function Chat() {
     });
   };
 
-  if (!talent) {
+  const formatBookingDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  };
+
+  if (!talent || !booking) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Chat tidak ditemukan</h2>
-          <p className="text-muted-foreground mb-4">
-            Chat hanya tersedia setelah booking berhasil
+      <div className="min-h-screen flex items-center justify-center bg-gradient-warm">
+        <Card className="p-8 text-center max-w-md mx-4">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+            <Info className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Chat Tidak Ditemukan</h2>
+          <p className="text-muted-foreground mb-6">
+            Chat hanya tersedia setelah booking berhasil dikonfirmasi
           </p>
           <Link to="/talents">
-            <Button>Cari Talent</Button>
+            <Button variant="hero">Cari Talent</Button>
           </Link>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -91,11 +125,9 @@ export default function Chat() {
     <div className="h-screen flex flex-col bg-background">
       {/* Chat Header */}
       <div className="flex-shrink-0 bg-card border-b px-4 py-3 flex items-center gap-3 mt-14 md:mt-16">
-        <Link to="/talents">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-        </Link>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/chat")}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
 
         <Link to={`/talent/${talent.id}`} className="flex items-center gap-3 flex-1">
           <div className="relative">
@@ -119,32 +151,72 @@ export default function Chat() {
           <Button variant="ghost" size="icon">
             <Video className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => setShowBookingInfo(!showBookingInfo)}
+          >
             <MoreVertical className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
-      {/* Booking Info */}
-      <div className="flex-shrink-0 bg-accent/50 px-4 py-3 border-b">
+      {/* Booking Info Banner */}
+      <div 
+        className="flex-shrink-0 bg-accent/50 px-4 py-3 border-b cursor-pointer hover:bg-accent/70 transition-colors"
+        onClick={() => setShowBookingInfo(!showBookingInfo)}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-primary" />
             <span className="text-sm">
-              Booking aktif: <strong>2 jam</strong> • Nongkrong / Ngobrol
+              <strong>{booking.purpose}</strong> • {booking.duration} jam
             </span>
           </div>
-          <Badge variant="success">Dikonfirmasi</Badge>
+          <Badge variant={booking.status === "active" ? "success" : "secondary"}>
+            {booking.status === "active" ? "Aktif" : "Selesai"}
+          </Badge>
         </div>
       </div>
+
+      {/* Booking Details Expandable */}
+      {showBookingInfo && (
+        <div className="flex-shrink-0 bg-card border-b p-4 animate-fade-in">
+          <h4 className="font-semibold mb-3">Detail Booking</h4>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary" />
+              <span>{formatBookingDate(booking.date)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" />
+              <span>{booking.time} • {booking.duration} jam</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary" />
+              <span className="capitalize">{booking.type}</span>
+            </div>
+            <div className="flex items-center gap-2 text-primary font-semibold">
+              Rp {booking.totalPrice.toLocaleString("id-ID")}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/30">
         {/* Date Separator */}
         <div className="flex items-center justify-center">
           <span className="text-xs text-muted-foreground bg-card px-3 py-1 rounded-full shadow-sm">
-            {formatDate(messages[0]?.timestamp || new Date().toISOString())}
+            {formatDate(messages[0]?.timestamp || booking.createdAt)}
           </span>
+        </div>
+
+        {/* System Message */}
+        <div className="flex justify-center">
+          <div className="bg-primary/10 text-primary text-xs px-4 py-2 rounded-full max-w-xs text-center">
+            🎉 Booking dikonfirmasi! Silakan koordinasi dengan {talent.name}
+          </div>
         </div>
 
         {messages.map((message) => (

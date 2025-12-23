@@ -1,23 +1,58 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login/register
-    console.log("Form submitted:", formData);
+    setIsLoading(true);
+
+    // Simulate login/register process
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    toast({
+      title: isLogin ? "Login Berhasil! 🎉" : "Pendaftaran Berhasil! 🎉",
+      description: isLogin
+        ? "Selamat datang kembali di RentMate"
+        : "Akun kamu sudah aktif, selamat menjelajah!",
+    });
+
+    setIsLoading(false);
+    
+    // Redirect to home after successful login
+    setTimeout(() => {
+      navigate("/talents");
+    }, 500);
+  };
+
+  const handleSocialLogin = async (provider: string) => {
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
+    toast({
+      title: `Login dengan ${provider} Berhasil! 🎉`,
+      description: "Selamat datang di RentMate",
+    });
+
+    setIsLoading(false);
+    setTimeout(() => {
+      navigate("/talents");
+    }, 500);
   };
 
   return (
@@ -46,15 +81,20 @@ export default function Login() {
             {!isLogin && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nama Lengkap</label>
-                <Input
-                  type="text"
-                  placeholder="Masukkan nama lengkap"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Masukkan nama lengkap"
+                    className="pl-11"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
             )}
 
@@ -71,6 +111,7 @@ export default function Login() {
                     setFormData({ ...formData, email: e.target.value })
                   }
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -88,6 +129,7 @@ export default function Login() {
                     setFormData({ ...formData, password: e.target.value })
                   }
                   required
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -111,9 +153,23 @@ export default function Login() {
               </div>
             )}
 
-            <Button variant="hero" size="lg" className="w-full group">
-              {isLogin ? "Masuk" : "Daftar"}
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <Button 
+              variant="hero" 
+              size="lg" 
+              className="w-full group"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  <span>Memproses...</span>
+                </div>
+              ) : (
+                <>
+                  {isLogin ? "Masuk" : "Daftar"}
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </form>
 
@@ -129,7 +185,13 @@ export default function Login() {
 
           {/* Social Login */}
           <div className="space-y-3">
-            <Button variant="outline" size="lg" className="w-full gap-3">
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="w-full gap-3"
+              onClick={() => handleSocialLogin("Google")}
+              disabled={isLoading}
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -151,7 +213,13 @@ export default function Login() {
               Lanjutkan dengan Google
             </Button>
 
-            <Button variant="outline" size="lg" className="w-full gap-3">
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="w-full gap-3"
+              onClick={() => handleSocialLogin("Apple")}
+              disabled={isLoading}
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
               </svg>
@@ -166,10 +234,32 @@ export default function Login() {
               type="button"
               className="text-primary font-semibold hover:underline"
               onClick={() => setIsLogin(!isLogin)}
+              disabled={isLoading}
             >
               {isLogin ? "Daftar sekarang" : "Masuk"}
             </button>
           </p>
+
+          {/* Features */}
+          {!isLogin && (
+            <div className="mt-6 pt-6 border-t space-y-2">
+              <p className="text-xs text-muted-foreground text-center mb-3">
+                Dengan mendaftar, kamu mendapatkan:
+              </p>
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span>Akses ke ribuan talent terverifikasi</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span>Pembayaran aman & terlindungi</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span>Dukungan pelanggan 24/7</span>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Back to home */}

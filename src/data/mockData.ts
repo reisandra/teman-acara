@@ -290,37 +290,202 @@ export interface ChatMessage {
   status: "sent" | "delivered" | "read";
 }
 
-export const mockChats: ChatMessage[] = [
+export interface Booking {
+  id: string;
+  talentId: string;
+  userId: string;
+  duration: number;
+  purpose: string;
+  type: "online" | "offline";
+  date: string;
+  time: string;
+  status: "active" | "completed" | "cancelled";
+  totalPrice: number;
+  createdAt: string;
+}
+
+export interface ChatRoom {
+  id: string;
+  bookingId: string;
+  talentId: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  messages: ChatMessage[];
+}
+
+// Mock bookings - each booking creates a unique chat
+export const mockBookings: Booking[] = [
   {
-    id: "m1",
-    senderId: "user1",
-    senderType: "user",
-    message: "Halo Aisyah! Booking saya sudah dikonfirmasi ya?",
-    timestamp: "2024-01-20T10:30:00",
-    status: "read",
+    id: "booking-1",
+    talentId: "1",
+    userId: "user1",
+    duration: 2,
+    purpose: "Nongkrong / Ngobrol",
+    type: "offline",
+    date: "2024-01-20",
+    time: "14:00",
+    status: "active",
+    totalPrice: 300000,
+    createdAt: "2024-01-18T10:00:00",
   },
   {
-    id: "m2",
-    senderId: "1",
-    senderType: "talent",
-    message: "Halo! Iya sudah dikonfirmasi. Kita ketemuan di mana ya?",
-    timestamp: "2024-01-20T10:32:00",
-    status: "read",
+    id: "booking-2",
+    talentId: "3",
+    userId: "user1",
+    duration: 3,
+    purpose: "Traveling / Liburan",
+    type: "offline",
+    date: "2024-01-22",
+    time: "10:00",
+    status: "active",
+    totalPrice: 390000,
+    createdAt: "2024-01-19T15:00:00",
   },
   {
-    id: "m3",
-    senderId: "user1",
-    senderType: "user",
-    message: "Di Grand Indonesia ya, jam 2 siang. Bisa kan?",
-    timestamp: "2024-01-20T10:35:00",
-    status: "read",
-  },
-  {
-    id: "m4",
-    senderId: "1",
-    senderType: "talent",
-    message: "Siap! Aku tunggu di lobby ya. Sampai ketemu! 😊",
-    timestamp: "2024-01-20T10:36:00",
-    status: "delivered",
+    id: "booking-3",
+    talentId: "5",
+    userId: "user1",
+    duration: 2,
+    purpose: "Olahraga Bareng",
+    type: "offline",
+    date: "2024-01-15",
+    time: "07:00",
+    status: "completed",
+    totalPrice: 280000,
+    createdAt: "2024-01-10T09:00:00",
   },
 ];
+
+// Each booking has its own chat room with unique messages
+export const mockChatRooms: ChatRoom[] = [
+  {
+    id: "chat-1",
+    bookingId: "booking-1",
+    talentId: "1",
+    lastMessage: "Siap! Aku tunggu di lobby ya. Sampai ketemu! 😊",
+    lastMessageTime: "2024-01-20T10:36:00",
+    unreadCount: 2,
+    messages: [
+      {
+        id: "m1-1",
+        senderId: "user1",
+        senderType: "user",
+        message: "Halo Aisyah! Booking saya sudah dikonfirmasi ya?",
+        timestamp: "2024-01-20T10:30:00",
+        status: "read",
+      },
+      {
+        id: "m1-2",
+        senderId: "1",
+        senderType: "talent",
+        message: "Halo! Iya sudah dikonfirmasi. Kita ketemuan di mana ya?",
+        timestamp: "2024-01-20T10:32:00",
+        status: "read",
+      },
+      {
+        id: "m1-3",
+        senderId: "user1",
+        senderType: "user",
+        message: "Di Grand Indonesia ya, jam 2 siang. Bisa kan?",
+        timestamp: "2024-01-20T10:35:00",
+        status: "read",
+      },
+      {
+        id: "m1-4",
+        senderId: "1",
+        senderType: "talent",
+        message: "Siap! Aku tunggu di lobby ya. Sampai ketemu! 😊",
+        timestamp: "2024-01-20T10:36:00",
+        status: "delivered",
+      },
+    ],
+  },
+  {
+    id: "chat-2",
+    bookingId: "booking-2",
+    talentId: "3",
+    lastMessage: "Oke, besok ya! Jangan lupa bawa kamera 📸",
+    lastMessageTime: "2024-01-19T15:20:00",
+    unreadCount: 0,
+    messages: [
+      {
+        id: "m2-1",
+        senderId: "user1",
+        senderType: "user",
+        message: "Hai Maya! Aku booking untuk traveling ke Bromo nih",
+        timestamp: "2024-01-19T15:00:00",
+        status: "read",
+      },
+      {
+        id: "m2-2",
+        senderId: "3",
+        senderType: "talent",
+        message: "Wah seru banget! Aku udah pernah ke sana, tempatnya keren!",
+        timestamp: "2024-01-19T15:05:00",
+        status: "read",
+      },
+      {
+        id: "m2-3",
+        senderId: "user1",
+        senderType: "user",
+        message: "Asik! Kita berangkat jam 10 pagi ya dari Surabaya",
+        timestamp: "2024-01-19T15:15:00",
+        status: "read",
+      },
+      {
+        id: "m2-4",
+        senderId: "3",
+        senderType: "talent",
+        message: "Oke, besok ya! Jangan lupa bawa kamera 📸",
+        timestamp: "2024-01-19T15:20:00",
+        status: "read",
+      },
+    ],
+  },
+  {
+    id: "chat-3",
+    bookingId: "booking-3",
+    talentId: "5",
+    lastMessage: "Makasih ya udah yoga bareng! Next time lagi ya 🧘‍♀️",
+    lastMessageTime: "2024-01-15T10:00:00",
+    unreadCount: 0,
+    messages: [
+      {
+        id: "m3-1",
+        senderId: "user1",
+        senderType: "user",
+        message: "Hai Sinta! Aku mau yoga di pantai besok pagi",
+        timestamp: "2024-01-14T20:00:00",
+        status: "read",
+      },
+      {
+        id: "m3-2",
+        senderId: "5",
+        senderType: "talent",
+        message: "Perfect! Aku rekomendasiin Sanur Beach, sunrise-nya bagus banget",
+        timestamp: "2024-01-14T20:15:00",
+        status: "read",
+      },
+      {
+        id: "m3-3",
+        senderId: "user1",
+        senderType: "user",
+        message: "Terima kasih sessionnya tadi! Refreshing banget 😊",
+        timestamp: "2024-01-15T09:30:00",
+        status: "read",
+      },
+      {
+        id: "m3-4",
+        senderId: "5",
+        senderType: "talent",
+        message: "Makasih ya udah yoga bareng! Next time lagi ya 🧘‍♀️",
+        timestamp: "2024-01-15T10:00:00",
+        status: "read",
+      },
+    ],
+  },
+];
+
+// Legacy export for backward compatibility
+export const mockChats: ChatMessage[] = mockChatRooms[0]?.messages || [];

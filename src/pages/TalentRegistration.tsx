@@ -107,8 +107,11 @@ export default function TalentRegistration() {
 
     toast({
       title: "Pendaftaran Talent Berhasil! 🎉",
-      description: "Profil Anda sedang disiapkan",
+      description: "Akun Anda sekarang terdaftar sebagai Talent",
     });
+
+    // Store talent status in localStorage for UI state
+    localStorage.setItem("userRole", "talent");
 
     setIsLoading(false);
     setTimeout(() => {

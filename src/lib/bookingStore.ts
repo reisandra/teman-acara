@@ -83,6 +83,15 @@ export function getBookingsByStatus(status: SharedBooking["approvalStatus"]): Sh
   return getBookings().filter((b) => b.approvalStatus === status);
 }
 
+// Get active booking for a specific talent (pending_approval or approved)
+export function getActiveBookingByTalent(talentId: string): SharedBooking | undefined {
+  const bookings = getBookings();
+  return bookings.find(
+    (b) => b.talentId === talentId && 
+    (b.approvalStatus === "pending_approval" || b.approvalStatus === "approved")
+  );
+}
+
 // Hook helper to subscribe to booking updates
 export function subscribeToBookings(callback: () => void): () => void {
   window.addEventListener("bookingsUpdated", callback);

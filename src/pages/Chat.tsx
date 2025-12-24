@@ -107,29 +107,22 @@ export default function Chat() {
   const handleSend = () => {
     if (!newMessage.trim() || !bookingId || !chatSession) return;
 
-    // Add user message
+    const messageText = newMessage;
+    setNewMessage("");
+
+    // SINGLE SOURCE: Only add to store, subscription will update UI
     const userMessage = addMessageToChat(bookingId, {
       senderId: "user1",
       senderType: "user",
-      message: newMessage,
+      message: messageText,
       status: "sent",
     });
 
     if (!userMessage) return;
 
-    setNewMessage("");
-
-    // Update local state immediately
-    setMessages((prev) => [...prev, userMessage]);
-
-    // Simulate delivery after 1 second
+    // Simulate delivery after 1 second (store updates, subscription syncs UI)
     setTimeout(() => {
       updateMessageStatus(bookingId, userMessage.id, "delivered");
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === userMessage.id ? { ...msg, status: "delivered" as const } : msg
-        )
-      );
     }, 1000);
 
     // Show typing indicator
@@ -142,35 +135,27 @@ export default function Chat() {
       setIsTyping(false);
 
       const contextualMessage = getContextualResponse(
-        newMessage,
+        messageText,
         chatSession.talentName
       );
 
-      const talentMessage = addMessageToChat(bookingId, {
+      // SINGLE SOURCE: Only add to store
+      addMessageToChat(bookingId, {
         senderId: chatSession.talentId,
         senderType: "talent",
         message: contextualMessage,
         status: "delivered",
       });
 
-      if (talentMessage) {
-        // Mark user messages as read when talent replies
-        setMessages((prev) => [
-          ...prev.map((msg) =>
-            msg.senderType === "user" && msg.status !== "read"
-              ? { ...msg, status: "read" as const }
-              : msg
-          ),
-          talentMessage,
-        ]);
-      }
+      // Mark user messages as read
+      markChatAsRead(bookingId);
     }, 2500);
   };
 
   const handleDeleteMessage = (messageId: string) => {
     if (!bookingId) return;
+    // SINGLE SOURCE: Only delete from store, subscription will sync UI
     deleteMessageFromChat(bookingId, messageId);
-    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
   };
 
   const formatDate = (dateString: string) => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   User,
@@ -26,21 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RatingModal } from "@/components/RatingModal";
 import { talents } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock user data
-const initialUserData = {
-  name: "Budi Santoso",
-  username: "budisantoso",
-  email: "budi@email.com",
-  phone: "+62 812 3456 7890",
-  bio: "Suka traveling dan ngobrol santai",
-  city: "Jakarta",
-  hobbies: "Traveling, Fotografi, Kuliner",
-  preference: "offline" as "online" | "offline" | "both",
-  photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face",
-  joinDate: "Januari 2024",
-  wallet: 500000,
-};
+import { getCurrentUser, updateCurrentUser, UserProfile } from "@/lib/userStore";
 
 const mockBookings = [
   {
@@ -69,14 +55,21 @@ export default function Profile() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("bookings");
   const [isEditing, setIsEditing] = useState(false);
-  const [userData, setUserData] = useState(initialUserData);
-  const [editData, setEditData] = useState(initialUserData);
+  const [userData, setUserData] = useState<UserProfile>(getCurrentUser);
+  const [editData, setEditData] = useState<UserProfile>(getCurrentUser);
   const [ratingModal, setRatingModal] = useState<{
     isOpen: boolean;
     talentId: string;
     bookingId: string;
   }>({ isOpen: false, talentId: "", bookingId: "" });
   const [ratedBookings, setRatedBookings] = useState<string[]>([]);
+
+  // Load user from store on mount
+  useEffect(() => {
+    const user = getCurrentUser();
+    setUserData(user);
+    setEditData(user);
+  }, []);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -97,7 +90,9 @@ export default function Profile() {
   };
 
   const handleSaveProfile = () => {
-    setUserData(editData);
+    // Update in userStore so it persists and syncs across app
+    const updated = updateCurrentUser(editData);
+    setUserData(updated);
     setIsEditing(false);
     toast({
       title: "Profil berhasil diperbarui",

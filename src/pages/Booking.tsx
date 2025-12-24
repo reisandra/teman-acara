@@ -20,6 +20,7 @@ import { talents, bookingPurposes } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { addBooking, getBookingById, getActiveBookingByTalent, subscribeToBookings, SharedBooking } from "@/lib/bookingStore";
+import { getCurrentUser } from "@/lib/userStore";
 
 type BookingStatus = "draft" | "pending_payment" | "pending_approval" | "approved" | "rejected";
 
@@ -144,10 +145,13 @@ export default function Booking() {
     
     // Simulasi pembayaran (2 detik) dan simpan ke shared store
     setTimeout(() => {
-      // Create booking in shared store
+      // Get current logged-in user identity
+      const currentUser = getCurrentUser();
+      
+      // Create booking in shared store with REAL user identity
       const newBooking = addBooking({
-        userName: "Pengguna Demo", // In real app, this would come from auth
-        userPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
+        userName: currentUser.name,
+        userPhoto: currentUser.photo,
         talentId: talent.id,
         talentName: talent.name,
         talentPhoto: talent.photo,

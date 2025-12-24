@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   ShieldCheck,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -221,47 +222,68 @@ export default function Booking() {
           {getStatusBadge()}
         </div>
 
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center mb-8">
+        {/* Progress Steps - 5 Steps */}
+        <div className="flex items-center justify-center mb-8 overflow-x-auto pb-2">
           {[
             { num: 1, label: "Detail" },
             { num: 2, label: "Jadwal" },
             { num: 3, label: "Bayar" },
             { num: 4, label: "Approval" },
-          ].map((s, i) => (
-            <div key={s.num} className="flex items-center">
-              <div className="flex flex-col items-center">
-                <div
-                  className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all",
-                    step >= s.num || (s.num === 4 && bookingStatus === "pending_approval")
-                      ? "bg-primary text-primary-foreground shadow-orange"
-                      : "bg-muted text-muted-foreground",
-                    bookingStatus === "approved" && s.num === 4 && "bg-green-500"
-                  )}
-                >
-                  {(step > s.num || (s.num === 4 && bookingStatus === "approved")) ? (
-                    <CheckCircle2 className="w-5 h-5" />
-                  ) : s.num === 4 && bookingStatus === "pending_approval" ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    s.num
-                  )}
+            { num: 5, label: "Chat" },
+          ].map((s, i) => {
+            // Determine step completion status
+            const isCompleted = 
+              step > s.num || 
+              (s.num === 3 && bookingStatus !== "draft") ||
+              (s.num === 4 && bookingStatus === "approved") ||
+              (s.num === 5 && bookingStatus === "approved");
+            
+            const isActive = 
+              step === s.num || 
+              (s.num === 4 && bookingStatus === "pending_approval") ||
+              (s.num === 5 && bookingStatus === "approved");
+            
+            const isPending = s.num === 4 && bookingStatus === "pending_approval";
+            const isApproved = bookingStatus === "approved";
+            
+            return (
+              <div key={s.num} className="flex items-center">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={cn(
+                      "w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-semibold transition-all text-sm",
+                      isCompleted || isActive
+                        ? "bg-primary text-primary-foreground shadow-orange"
+                        : "bg-muted text-muted-foreground",
+                      s.num === 4 && isApproved && "bg-green-500",
+                      s.num === 5 && isApproved && "bg-green-500"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
+                    ) : isPending ? (
+                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+                    ) : s.num === 5 ? (
+                      <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
+                    ) : (
+                      s.num
+                    )}
+                  </div>
+                  <span className="text-xs mt-1 text-muted-foreground whitespace-nowrap">{s.label}</span>
                 </div>
-                <span className="text-xs mt-1 text-muted-foreground">{s.label}</span>
+                {i < 4 && (
+                  <div
+                    className={cn(
+                      "w-8 md:w-16 h-1 mx-1 md:mx-2 rounded-full transition-all",
+                      (step > s.num || (s.num === 3 && bookingStatus !== "draft") || (s.num === 4 && isApproved))
+                        ? "bg-primary" 
+                        : "bg-muted"
+                    )}
+                  />
+                )}
               </div>
-              {i < 3 && (
-                <div
-                  className={cn(
-                    "w-12 md:w-20 h-1 mx-2 rounded-full transition-all",
-                    step > s.num || (s.num === 3 && bookingStatus !== "draft") 
-                      ? "bg-primary" 
-                      : "bg-muted"
-                  )}
-                />
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -532,17 +554,30 @@ export default function Booking() {
                 </div>
               )}
 
-              {/* Approved State */}
+              {/* Approved State - Step 5: Chat Active */}
               {bookingStatus === "approved" && (
-                <div className="py-12 text-center animate-fade-in">
+                <div className="py-8 text-center animate-fade-in">
                   <div className="w-20 h-20 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
                     <CheckCircle2 className="w-10 h-10 text-green-500" />
                   </div>
                   <h2 className="text-xl font-bold mb-2">Pemesanan Disetujui!</h2>
-                  <p className="text-muted-foreground mb-4">
-                    Mengalihkan ke percakapan dengan {talent.name}...
+                  <p className="text-muted-foreground mb-6">
+                    Percakapan dengan {talent.name} sudah aktif
                   </p>
-                  <Loader2 className="w-6 h-6 mx-auto text-primary animate-spin" />
+                  
+                  {/* Chat Button - Active */}
+                  <Link to={`/chat/${talent.id}`}>
+                    <Button variant="hero" size="lg" className="gap-2">
+                      <MessageCircle className="w-5 h-5" />
+                      Buka Percakapan
+                    </Button>
+                  </Link>
+                  
+                  <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      ✅ Langkah 5: Percakapan Aktif - Kamu bisa mulai ngobrol sekarang!
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -631,11 +666,20 @@ export default function Booking() {
               <div className="mt-4 pt-4 border-t">
                 <p className="text-xs font-medium mb-2">Alur Pemesanan:</p>
                 <ol className="text-xs text-muted-foreground space-y-1">
-                  <li className={cn(step >= 1 && "text-primary")}>1. Pilih detail</li>
-                  <li className={cn(step >= 2 && "text-primary")}>2. Atur jadwal</li>
-                  <li className={cn(step >= 3 && "text-primary")}>3. Bayar</li>
-                  <li className={cn(bookingStatus === "pending_approval" && "text-primary")}>4. Tunggu approval admin</li>
-                  <li className={cn(bookingStatus === "approved" && "text-primary")}>5. Percakapan aktif</li>
+                  <li className={cn(step >= 1 && "text-primary font-medium")}>1. Pilih detail</li>
+                  <li className={cn(step >= 2 && "text-primary font-medium")}>2. Atur jadwal</li>
+                  <li className={cn(step >= 3 && "text-primary font-medium")}>3. Bayar</li>
+                  <li className={cn(
+                    bookingStatus === "pending_approval" && "text-primary font-medium",
+                    bookingStatus === "approved" && "text-green-500 font-medium"
+                  )}>
+                    4. Tunggu approval admin {bookingStatus === "approved" && "✓"}
+                  </li>
+                  <li className={cn(
+                    bookingStatus === "approved" && "text-green-500 font-medium"
+                  )}>
+                    5. Percakapan aktif {bookingStatus === "approved" && "✓"}
+                  </li>
                 </ol>
               </div>
             </Card>

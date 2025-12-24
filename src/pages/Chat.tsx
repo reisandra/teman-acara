@@ -19,8 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ChatBubble } from "@/components/ChatBubble";
-import { talents, getContextualResponse } from "@/data/mockData";
 import { getBookingById } from "@/lib/bookingStore";
+import { generateContextualResponse } from "@/lib/chatContextEngine";
 import {
   getChatSessionByBookingId,
   getOrCreateChatSession,
@@ -130,12 +130,18 @@ export default function Chat() {
       setIsTyping(true);
     }, 1200);
 
-    // Simulate talent response
+    // Simulate talent response with FULL CONTEXT
     setTimeout(() => {
       setIsTyping(false);
 
-      const contextualMessage = getContextualResponse(
+      // Get current session to access latest message history
+      const currentSession = getChatSessionByBookingId(bookingId);
+      const messageHistory = currentSession?.messages || [];
+
+      // Generate response using FULL conversation history
+      const contextualMessage = generateContextualResponse(
         messageText,
+        messageHistory,
         chatSession.talentName
       );
 

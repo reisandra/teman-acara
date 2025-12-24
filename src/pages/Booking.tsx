@@ -555,7 +555,7 @@ export default function Booking() {
               )}
 
               {/* Approved State - Step 5: Chat Active */}
-              {bookingStatus === "approved" && (
+              {bookingStatus === "approved" && currentBookingId && (
                 <div className="py-8 text-center animate-fade-in">
                   <div className="w-20 h-20 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
                     <CheckCircle2 className="w-10 h-10 text-green-500" />
@@ -565,8 +565,8 @@ export default function Booking() {
                     Percakapan dengan {talent.name} sudah aktif
                   </p>
                   
-                  {/* Chat Button - Active */}
-                  <Link to={`/chat/${talent.id}`}>
+                  {/* Chat Button - Active - Link to booking ID for chat context */}
+                  <Link to={`/chat/${currentBookingId}`}>
                     <Button variant="hero" size="lg" className="gap-2">
                       <MessageCircle className="w-5 h-5" />
                       Buka Percakapan

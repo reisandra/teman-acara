@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { talents, bookingPurposes } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { addBooking, getBookingById, subscribeToBookings, SharedBooking } from "@/lib/bookingStore";
+import { addBooking, getBookingById, getActiveBookingByTalent, subscribeToBookings, SharedBooking } from "@/lib/bookingStore";
 
 type BookingStatus = "draft" | "pending_payment" | "pending_approval" | "approved" | "rejected";
 
@@ -41,6 +41,33 @@ export default function Booking() {
     time: "",
     notes: "",
   });
+
+  // Check for existing active booking on page load (STEP LOCK)
+  useEffect(() => {
+    if (!id) return;
+    
+    const existingBooking = getActiveBookingByTalent(id);
+    if (existingBooking) {
+      // Restore booking state - LOCK the step
+      setCurrentBookingId(existingBooking.id);
+      setStep(3); // Lock at final step
+      setBookingData({
+        duration: existingBooking.duration,
+        purpose: existingBooking.purpose,
+        type: existingBooking.type,
+        date: existingBooking.date,
+        time: existingBooking.time,
+        notes: existingBooking.notes || "",
+      });
+      
+      // Set appropriate status based on approval
+      if (existingBooking.approvalStatus === "approved") {
+        setBookingStatus("approved");
+      } else if (existingBooking.approvalStatus === "pending_approval") {
+        setBookingStatus("pending_approval");
+      }
+    }
+  }, [id]);
 
   // Subscribe to booking updates from Admin
   useEffect(() => {

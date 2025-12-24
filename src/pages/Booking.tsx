@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { talents, bookingPurposes } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { addBooking, getBookingById, subscribeToBookings, SharedBooking } from "@/lib/bookingStore";
 
 type BookingStatus = "draft" | "pending_payment" | "pending_approval" | "approved" | "rejected";
 
@@ -31,6 +32,7 @@ export default function Booking() {
   const [step, setStep] = useState(1);
   const [bookingStatus, setBookingStatus] = useState<BookingStatus>("draft");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
   const [bookingData, setBookingData] = useState({
     duration: 2,
     purpose: "",
@@ -39,6 +41,40 @@ export default function Booking() {
     time: "",
     notes: "",
   });
+
+  // Subscribe to booking updates from Admin
+  useEffect(() => {
+    if (!currentBookingId) return;
+    
+    const checkStatus = () => {
+      const booking = getBookingById(currentBookingId);
+      if (booking) {
+        if (booking.approvalStatus === "approved" && bookingStatus !== "approved") {
+          setBookingStatus("approved");
+          toast({
+            title: "Pemesanan Disetujui!",
+            description: "Admin telah menyetujui pemesanan. Percakapan sudah aktif.",
+          });
+        } else if (booking.approvalStatus === "rejected" && bookingStatus !== "rejected") {
+          setBookingStatus("rejected");
+          toast({
+            title: "Pemesanan Ditolak",
+            description: "Maaf, admin menolak pemesanan Anda.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    const unsubscribe = subscribeToBookings(checkStatus);
+    // Also check on interval for cross-tab sync
+    const interval = setInterval(checkStatus, 1000);
+    
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [currentBookingId, bookingStatus, toast]);
 
   if (!talent) {
     return (
@@ -79,8 +115,27 @@ export default function Booking() {
     setBookingStatus("pending_payment");
     setIsProcessing(true);
     
-    // Simulasi pembayaran (2 detik)
+    // Simulasi pembayaran (2 detik) dan simpan ke shared store
     setTimeout(() => {
+      // Create booking in shared store
+      const newBooking = addBooking({
+        userName: "Pengguna Demo", // In real app, this would come from auth
+        userPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
+        talentId: talent.id,
+        talentName: talent.name,
+        talentPhoto: talent.photo,
+        purpose: bookingData.purpose,
+        type: bookingData.type,
+        date: bookingData.date,
+        time: bookingData.time,
+        duration: bookingData.duration,
+        total: totalPrice,
+        notes: bookingData.notes,
+        paymentStatus: "paid",
+        approvalStatus: "pending_approval",
+      });
+      
+      setCurrentBookingId(newBooking.id);
       setIsProcessing(false);
       setBookingStatus("pending_approval");
       toast({

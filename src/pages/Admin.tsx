@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -23,6 +23,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { talents } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  getPendingBookings, 
+  updateBookingStatus, 
+  subscribeToBookings,
+  SharedBooking 
+} from "@/lib/bookingStore";
 
 const stats = [
   { label: "Total Pengguna", value: "10,234", icon: Users, change: "+12%" },
@@ -36,64 +42,40 @@ const pendingVerifications = [
   { id: "v2", name: "Rizky Pratama", email: "rizky@email.com", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", date: "2024-01-19" },
 ];
 
-const pendingBookings = [
-  { 
-    id: "pb1", 
-    userName: "Andi Wijaya", 
-    userPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
-    talentName: "Sarah Putri",
-    talentPhoto: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
-    purpose: "Nongkrong / Ngobrol",
-    date: "2024-01-25",
-    time: "14:00",
-    duration: 2,
-    total: 300000,
-    paymentStatus: "paid",
-    approvalStatus: "pending_approval"
-  },
-  { 
-    id: "pb2", 
-    userName: "Dian Permata", 
-    userPhoto: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
-    talentName: "Maya Indah",
-    talentPhoto: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop&crop=face",
-    purpose: "Dinner / Makan Malam",
-    date: "2024-01-26",
-    time: "19:00",
-    duration: 3,
-    total: 390000,
-    paymentStatus: "paid",
-    approvalStatus: "pending_approval"
-  },
-  { 
-    id: "pb3", 
-    userName: "Riko Saputra", 
-    userPhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
-    talentName: "Lisa Andriani",
-    talentPhoto: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face",
-    purpose: "Temani ke Acara",
-    date: "2024-01-27",
-    time: "10:00",
-    duration: 4,
-    total: 520000,
-    paymentStatus: "paid",
-    approvalStatus: "pending_approval"
-  },
-];
+// Removed hardcoded pendingBookings - now using shared store
 
 export default function Admin() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [bookings, setBookings] = useState(pendingBookings);
+  const [bookings, setBookings] = useState<SharedBooking[]>([]);
   const { toast } = useToast();
 
-  // Check admin authentication
+  // Load bookings from shared store
+  const loadBookings = useCallback(() => {
+    const pending = getPendingBookings();
+    setBookings(pending);
+  }, []);
+
+  // Check admin authentication and load bookings
   useEffect(() => {
     const isAdminAuthenticated = sessionStorage.getItem("adminAuthenticated");
     if (!isAdminAuthenticated) {
       navigate("/admin-login");
+      return;
     }
-  }, [navigate]);
+    loadBookings();
+  }, [navigate, loadBookings]);
+
+  // Subscribe to booking updates
+  useEffect(() => {
+    const unsubscribe = subscribeToBookings(loadBookings);
+    // Also poll for cross-tab updates
+    const interval = setInterval(loadBookings, 1000);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [loadBookings]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("adminAuthenticated");
@@ -113,7 +95,8 @@ export default function Admin() {
   };
 
   const handleApproveBooking = (bookingId: string) => {
-    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    updateBookingStatus(bookingId, "approved");
+    loadBookings(); // Refresh the list
     toast({
       title: "Pemesanan Disetujui",
       description: "Percakapan antara pengguna dan pendamping sudah aktif",
@@ -121,7 +104,8 @@ export default function Admin() {
   };
 
   const handleRejectBooking = (bookingId: string) => {
-    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    updateBookingStatus(bookingId, "rejected");
+    loadBookings(); // Refresh the list
     toast({
       title: "Pemesanan Ditolak",
       description: "Pengguna akan menerima notifikasi penolakan",

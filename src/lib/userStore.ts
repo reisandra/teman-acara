@@ -14,22 +14,58 @@ export interface UserProfile {
   photo: string;
   joinDate: string;
   wallet: number;
+  notifications?: NotificationItem[];
+}
+
+export interface NotificationItem {
+  id: number;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  type: "payment" | "booking" | "admin";
 }
 
 // Default logged-in user (simulated)
 const defaultUser: UserProfile = {
   id: "user_001",
-  name: "Budi Santoso",
-  username: "budisantoso",
-  email: "budi@email.com",
+  name: "Jane Priscilla",
+  username: "janepriscilla",
+  email: "jane.priscilla@email.com",
   phone: "+62 812 3456 7890",
   bio: "Suka traveling dan ngobrol santai",
   city: "Jakarta",
   hobbies: "Traveling, Fotografi, Kuliner",
-  preference: "offline",
-  photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face",
+  preference: "online",
+  photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face",
   joinDate: "Januari 2024",
   wallet: 500000,
+  notifications: [
+    {
+      id: 1,
+      title: "Pembayaran Berhasil",
+      message: "Pembayaran untuk booking #B123 telah diterima.",
+      time: "Baru saja",
+      read: false,
+      type: "payment",
+    },
+    {
+      id: 2,
+      title: "Pemesanan Dikonfirmasi",
+      message: "Talent menerima pesanan Anda untuk tanggal 25 Jan.",
+      time: "1 jam yang lalu",
+      read: true,
+      type: "booking",
+    },
+    {
+      id: 3,
+      title: "Persetujuan Admin",
+      message: "Verifikasi identitas Anda telah disetujui.",
+      time: "1 hari yang lalu",
+      read: true,
+      type: "admin",
+    },
+  ],
 };
 
 const STORAGE_KEY = "rentmate_current_user";
@@ -56,6 +92,17 @@ export function updateCurrentUser(updates: Partial<UserProfile>): UserProfile {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   window.dispatchEvent(new CustomEvent("userUpdated"));
   return updated;
+}
+
+export function markAllNotificationsRead(): UserProfile {
+  const current = getCurrentUser();
+  const notifications = (current.notifications || []).map((n) => ({ ...n, read: true }));
+  return updateCurrentUser({ notifications });
+}
+
+export function getUnreadNotificationCount(): number {
+  const current = getCurrentUser();
+  return (current.notifications || []).filter((n) => !n.read).length;
 }
 
 // Subscribe to user updates

@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
       title: "1. Informasi yang Kami Kumpulkan",
       content: [
         "Nama lengkap, alamat email, dan foto profil yang Anda berikan saat mendaftar",
-        "Data pemesanan termasuk riwayat, durasi, dan tujuan pendampingan",
+        "Data pemesanan termasuk riwayat, durasi, dan tujuan pertemanan",
         "Riwayat obrolan yang disimpan untuk keamanan dan moderasi platform",
         "Informasi perangkat secara umum untuk keperluan keamanan akun",
       ],
@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
       title: "2. Penggunaan Informasi",
       content: [
         "Untuk menjalankan dan meningkatkan layanan RentMate",
-        "Untuk mencocokkan pengguna dengan pendamping yang sesuai",
+        "Untuk mencocokkan pengguna dengan teman yang sesuai",
         "Untuk keamanan, verifikasi identitas, dan pencegahan penyalahgunaan",
         "Untuk mengirimkan notifikasi terkait pemesanan dan layanan",
       ],
@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
       icon: MessageSquare,
       title: "4. Privasi Obrolan",
       content: [
-        "Obrolan antara pengguna dan pendamping bersifat privat",
+        "Obrolan antara pengguna dan teman bersifat privat",
         "Konten obrolan tidak dipublikasikan atau dibagikan ke pihak luar",
         "Tim moderasi dapat mengakses obrolan jika terjadi pelanggaran aturan",
         "Riwayat obrolan dapat dihapus atas permintaan pengguna sesuai ketentuan",
@@ -47,7 +47,7 @@ export default function PrivacyPolicy() {
       icon: AlertCircle,
       title: "5. Konten & Etika",
       content: [
-        "RentMate adalah platform NON-SEKSUAL untuk teman pendamping profesional",
+        "RentMate adalah platform NON-SEKSUAL untuk teman profesional",
         "Dilarang keras menyebarkan konten pornografi, erotis, atau ajakan seksual",
         "Pelanggaran etika dapat mengakibatkan peringatan hingga suspend akun permanen",
         "Pengguna wajib menjaga komunikasi yang sopan dan profesional",

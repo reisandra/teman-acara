@@ -1,4 +1,6 @@
-import { useState } from "react";
+// src/components/TalentCard.tsx
+
+import { useState, memo } from "react";
 import { Link } from "react-router-dom";
 import { MapPin, Star, Clock, BadgeCheck, User } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -10,9 +12,17 @@ interface TalentCardProps {
   talent: Talent;
 }
 
-// Validasi data pendamping
+// Pindahkan fungsi formatPrice ke luar komponen
+const priceFormatter = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  minimumFractionDigits: 0,
+});
+const formatPrice = (price: number) => priceFormatter.format(price);
+
 const isValidTalent = (talent: Talent): boolean => {
   return !!(
+    talent &&
     talent.id &&
     talent.name &&
     talent.name.trim() !== "" &&
@@ -24,40 +34,64 @@ const isValidTalent = (talent: Talent): boolean => {
   );
 };
 
-export function TalentCard({ talent }: TalentCardProps) {
+// Gunakan React.memo untuk mencegah re-render yang tidak perlu
+export const TalentCard = memo<TalentCardProps>(({ talent }) => {
   const [imageError, setImageError] = useState(false);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
-
-  // Jangan render kartu jika data tidak valid
-  if (!isValidTalent(talent)) {
-    return null;
+  if (!talent || !isValidTalent(talent)) {
+    return (
+      <Card hover className="overflow-hidden group opacity-50">
+        <div className="w-full aspect-[4/5] bg-muted flex flex-col items-center justify-center">
+          <User className="w-16 h-16 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground mt-2">Data tidak valid</p>
+        </div>
+        <div className="p-4">
+          <div className="h-6 bg-gray-200 rounded mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+          <Button variant="hero" className="w-full" disabled>
+            Tidak Tersedia
+          </Button>
+        </div>
+      </Card>
+    );
   }
+
+  // Kalkulasi langsung tanpa useMemo untuk kesederhanaan
+  const talentPhoto = talent.photo;
+  const formattedPrice = formatPrice(talent.pricePerHour || talent.price || 0);
+  
+  let badgeVariant: "default" | "secondary" | "destructive" | "outline" | "accent" | "success" = "secondary";
+  let badgeText = "Offline";
+  if (talent.availability === "online") {
+    badgeVariant = "accent";
+    badgeText = "Online";
+  } else if (talent.availability === "both") {
+    badgeVariant = "success";
+    badgeText = "Online & Offline";
+  }
+
+  const displayedSkills = (talent.skills || []).slice(0, 3);
 
   return (
     <Card hover className="overflow-hidden group">
       <div className="relative">
         {imageError ? (
-          <div className="w-full aspect-[4/5] bg-muted flex items-center justify-center">
+          <div className="w-full aspect-[4/5] bg-muted flex flex-col items-center justify-center">
             <User className="w-16 h-16 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mt-2">Foto tidak tersedia</p>
           </div>
         ) : (
           <img
-            src={talent.photo}
-            alt={talent.name}
+            src={talentPhoto}
+            alt={`Foto ${talent.name}`}
             className="w-full aspect-[4/5] object-cover group-hover:scale-105 transition-transform duration-500"
-            onError={() => setImageError(true)}
+            loading="lazy" // Optimasi gambar tetap penting
+            onError={() => setImageError(true)} // Fungsi sederhana
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-transparent to-transparent" />
         
-        {talent.verified && (
+        {(talent.isVerified || talent.verified) && (
           <div className="absolute top-3 right-3">
             <Badge variant="default" className="gap-1">
               <BadgeCheck className="w-3 h-3" />
@@ -77,12 +111,12 @@ export function TalentCard({ talent }: TalentCardProps) {
             <span>{talent.city}</span>
             <span className="mx-1">•</span>
             <Star className="w-3 h-3 fill-current text-amber-400" />
-            <span>{talent.rating}</span>
-            <span className="opacity-70">({talent.reviewCount})</span>
+            <span>{talent.rating || 0}</span>
+            <span className="opacity-70">({talent.reviewCount || 0})</span>
           </div>
 
           <div className="flex flex-wrap gap-1">
-            {talent.skills.slice(0, 3).map((skill) => (
+            {displayedSkills.map((skill) => (
               <Badge key={skill} variant="secondary" className="text-xs bg-primary-foreground/20 text-primary-foreground border-0">
                 {skill}
               </Badge>
@@ -95,20 +129,22 @@ export function TalentCard({ talent }: TalentCardProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-1 text-primary font-bold">
             <Clock className="w-4 h-4" />
-            <span>{formatPrice(talent.pricePerHour)}</span>
+            <span>{formattedPrice}</span>
             <span className="text-muted-foreground font-normal text-sm">/jam</span>
           </div>
-          <Badge variant={talent.availability === "online" ? "accent" : talent.availability === "offline" ? "secondary" : "success"}>
-            {talent.availability === "online" ? "Online" : talent.availability === "offline" ? "Offline" : "Online & Offline"}
+          <Badge variant={badgeVariant}>
+            {badgeText}
           </Badge>
         </div>
 
         <Link to={`/talent/${talent.id}`}>
           <Button variant="hero" className="w-full">
-            Pilih Pendamping
+            Pilih Teman
           </Button>
         </Link>
       </div>
     </Card>
   );
-}
+});
+
+TalentCard.displayName = 'TalentCard';

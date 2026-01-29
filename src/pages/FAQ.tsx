@@ -10,33 +10,33 @@ export default function FAQ() {
       faqs: [
         {
           question: "Apa itu RentMate?",
-          answer: "RentMate adalah platform teman pendamping profesional yang menghubungkan Anda dengan pendamping terverifikasi untuk berbagai aktivitas sosial seperti menemani makan, traveling, menghadiri acara, atau sekadar ngobrol. RentMate adalah layanan NON-SEKSUAL dan 100% legal.",
+          answer: "RentMate adalah platform teman profesional yang menghubungkan Anda dengan teman terverifikasi untuk berbagai aktivitas sosial seperti menemani makan, traveling, menghadiri acara, atau sekadar ngobrol. RentMate adalah layanan NON-SEKSUAL dan 100% legal.",
         },
         {
           question: "Apakah RentMate layanan kencan?",
-          answer: "Tidak. RentMate BUKAN layanan kencan atau escort. RentMate adalah platform teman pendamping profesional yang murni bersifat sosial. Semua bentuk aktivitas romantis atau seksual dilarang keras dan akan mengakibatkan suspend akun.",
+          answer: "Tidak. RentMate BUKAN layanan kencan atau escort. RentMate adalah platform teman profesional yang murni bersifat sosial. Semua bentuk aktivitas romantis atau seksual dilarang keras dan akan mengakibatkan suspend akun.",
         },
         {
           question: "Apakah aman menggunakan RentMate?",
-          answer: "Ya, keamanan adalah prioritas utama kami. Semua pendamping melalui proses verifikasi ketat, data pengguna dilindungi dengan enkripsi tinggi, dan kami memiliki tim moderasi yang aktif memantau aktivitas di platform.",
+          answer: "Ya, keamanan adalah prioritas utama kami. Semua teman melalui proses verifikasi ketat, data pengguna dilindungi dengan enkripsi tinggi, dan kami memiliki tim moderasi yang aktif memantau aktivitas di platform.",
         },
       ],
     },
     {
       icon: Users,
-      title: "Pendamping",
+      title: "Teman",
       faqs: [
         {
-          question: "Bagaimana cara memilih pendamping?",
-          answer: "Anda bisa menjelajahi daftar pendamping di halaman Pendamping, menggunakan filter berdasarkan kota, hobi, gender, dan rentang usia. Klik profil pendamping untuk melihat detail lengkap termasuk bio, galeri foto, dan ulasan dari pengguna lain.",
+          question: "Bagaimana cara memilih Teman?",
+          answer: "Anda bisa menjelajahi daftar teman di halaman Teman, menggunakan filter berdasarkan kota, hobi, gender, dan rentang usia. Klik profil teman untuk melihat detail lengkap termasuk bio, galeri foto, dan ulasan dari pengguna lain.",
         },
         {
-          question: "Apakah pendamping bisa diganti setelah pemesanan?",
-          answer: "Tidak. Setiap pendamping memiliki identitas unik dan tidak dapat diganti setelah pemesanan dikonfirmasi. Pastikan Anda memilih pendamping dengan cermat sebelum melakukan pemesanan.",
+          question: "Apakah teman bisa diganti setelah pemesanan?",
+          answer: "Tidak. Setiap teman memiliki identitas unik dan tidak dapat diganti setelah pemesanan dikonfirmasi. Pastikan Anda memilih teman dengan cermat sebelum melakukan pemesanan.",
         },
         {
-          question: "Apakah semua pendamping sudah terverifikasi?",
-          answer: "Ya, semua pendamping yang tampil di RentMate sudah melalui proses verifikasi identitas dan screening. Kami memastikan setiap pendamping adalah orang yang profesional dan dapat dipercaya.",
+          question: "Apakah semua teman sudah terverifikasi?",
+          answer: "Ya, semua teman yang tampil di RentMate sudah melalui proses verifikasi identitas dan screening. Kami memastikan setiap teman adalah orang yang profesional dan dapat dipercaya.",
         },
       ],
     },
@@ -46,11 +46,11 @@ export default function FAQ() {
       faqs: [
         {
           question: "Bagaimana cara melakukan pemesanan?",
-          answer: "Pilih pendamping yang Anda inginkan, klik 'Pesan Sekarang', tentukan durasi, tujuan, dan tipe pendampingan (online/offline). Setelah pembayaran dikonfirmasi, pemesanan akan aktif dan Anda bisa mulai berkomunikasi melalui obrolan.",
+          answer: "Pilih teman yang Anda inginkan, klik 'Pesan Sekarang', tentukan durasi, tujuan, dan tipe teman (online/offline). Setelah pembayaran dikonfirmasi, pemesanan akan aktif dan Anda bisa mulai berkomunikasi melalui obrolan.",
         },
         {
           question: "Berapa durasi minimum pemesanan?",
-          answer: "Durasi minimum pemesanan adalah 1 jam. Anda bisa memilih durasi yang lebih panjang sesuai kebutuhan. Harga dihitung per jam berdasarkan tarif masing-masing pendamping.",
+          answer: "Durasi minimum pemesanan adalah 1 jam. Anda bisa memilih durasi yang lebih panjang sesuai kebutuhan. Harga dihitung per jam berdasarkan tarif masing-masing teman.",
         },
         {
           question: "Apakah bisa membatalkan pemesanan?",
@@ -64,11 +64,11 @@ export default function FAQ() {
       faqs: [
         {
           question: "Kapan obrolan bisa digunakan?",
-          answer: "Fitur obrolan hanya aktif setelah pemesanan berhasil dikonfirmasi. Anda dapat menggunakan obrolan untuk berkoordinasi dengan pendamping mengenai waktu, lokasi, dan detail aktivitas yang akan dilakukan.",
+          answer: "Fitur obrolan hanya aktif setelah pemesanan berhasil dikonfirmasi. Anda dapat menggunakan obrolan untuk berkoordinasi dengan teman mengenai waktu, lokasi, dan detail aktivitas yang akan dilakukan.",
         },
         {
           question: "Apakah obrolan bersifat privat?",
-          answer: "Ya, obrolan antara Anda dan pendamping bersifat privat. Namun, tim moderasi dapat mengakses riwayat obrolan jika terjadi laporan pelanggaran atau untuk keperluan keamanan platform.",
+          answer: "Ya, obrolan antara Anda dan teman bersifat privat. Namun, tim moderasi dapat mengakses riwayat obrolan jika terjadi laporan pelanggaran atau untuk keperluan keamanan platform.",
         },
         {
           question: "Apa yang terjadi jika ada pelanggaran dalam obrolan?",
@@ -81,8 +81,8 @@ export default function FAQ() {
       title: "Aturan & Larangan",
       faqs: [
         {
-          question: "Apakah ada kontak fisik saat pendampingan?",
-          answer: "Tidak. Pendampingan RentMate bersifat sosial dan profesional. Tidak ada kontak fisik romantis atau seksual. Pelanggaran terhadap aturan ini akan mengakibatkan suspend akun permanen.",
+          question: "Apakah ada kontak fisik saat bertemu?",
+          answer: "Tidak. Teman RentMate bersifat sosial dan profesional. Tidak ada kontak fisik romantis atau seksual. Pelanggaran terhadap aturan ini akan mengakibatkan suspend akun permanen.",
         },
         {
           question: "Apa saja yang dilarang di RentMate?",
@@ -104,7 +104,7 @@ export default function FAQ() {
         },
         {
           question: "Apakah harga sudah final?",
-          answer: "Harga yang tertera adalah harga per jam untuk layanan pendampingan. Tidak ada biaya tersembunyi. Biaya tambahan seperti makan, transportasi, atau tiket acara ditanggung sesuai kesepakatan dengan pendamping.",
+          answer: "Harga yang tertera adalah harga per jam untuk layanan pertemanan. Tidak ada biaya tersembunyi. Biaya tambahan seperti makan, transportasi, atau tiket acara ditanggung sesuai kesepakatan dengan teman.",
         },
         {
           question: "Bagaimana proses refund?",
@@ -126,7 +126,7 @@ export default function FAQ() {
         },
         {
           question: "Apakah ada jaminan kepuasan?",
-          answer: "Kami berkomitmen untuk memberikan pengalaman terbaik. Jika Anda tidak puas dengan layanan yang diterima karena kesalahan dari pihak pendamping, silakan hubungi customer service untuk penyelesaian yang adil.",
+          answer: "Kami berkomitmen untuk memberikan pengalaman terbaik. Jika Anda tidak puas dengan layanan yang diterima karena kesalahan dari pihak teman, silakan hubungi customer service untuk penyelesaian yang adil.",
         },
       ],
     },

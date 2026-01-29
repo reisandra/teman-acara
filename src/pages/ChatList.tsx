@@ -133,12 +133,12 @@ export default function ChatList() {
             </h3>
             <p className="text-muted-foreground mb-6">
               {searchQuery
-                ? "Coba kata kunci lain atau cari pendamping baru"
+                ? "Coba kata kunci lain atau cari teman baru"
                 : "Obrolan akan muncul setelah pemesanan kamu disetujui oleh admin"}
             </p>
             <Link to="/talents">
               <button className="text-primary font-semibold hover:underline">
-                Cari Pendamping Sekarang
+                Cari Teman Sekarang
               </button>
             </Link>
           </Card>

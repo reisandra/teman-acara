@@ -11,7 +11,7 @@ export default function Index() {
     {
       icon: Shield,
       title: "Keamanan Terjamin",
-      description: "Semua pendamping terverifikasi dan melalui proses screening ketat",
+      description: "Semua teman terverifikasi dan melalui proses screening ketat",
     },
     {
       icon: Lock,
@@ -27,7 +27,7 @@ export default function Index() {
 
   const stats = [
     { value: "10K+", label: "Pengguna Aktif" },
-    { value: "500+", label: "Pendamping Terverifikasi" },
+    { value: "500+", label: "Teman Terverifikasi" },
     { value: "25+", label: "Kota di Indonesia" },
     { value: "4.8", label: "Penilaian Rata-rata" },
   ];
@@ -46,11 +46,11 @@ export default function Index() {
             <div className="space-y-8 text-center lg:text-left animate-fade-up">
               <Badge variant="accent" className="text-sm px-4 py-1.5">
                 <Heart className="w-4 h-4 mr-1 fill-current" />
-                Platform Teman Pendamping #1 di Indonesia
+                Platform Teman #1 di Indonesia
               </Badge>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight">
-                Teman Jalan, Ngobrol & <span className="text-gradient">Pendamping Acara</span>
+                Teman Jalan, Ngobrol & <span className="text-gradient">Teman Acara</span>
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0">
@@ -60,7 +60,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Link to="/talents">
                   <Button variant="hero" size="xl" className="group">
-                    Pilih Pendamping
+                    Pilih Teman
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
@@ -131,7 +131,7 @@ export default function Index() {
               Kenapa Pilih <span className="text-gradient">RentMate?</span>
             </h2>
             <p className="text-muted-foreground text-lg">
-              Platform terpercaya untuk menemukan teman pendamping profesional
+              Platform terpercaya untuk menemukan teman profesional
             </p>
           </div>
 
@@ -156,15 +156,15 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Featured Pendamping */}
+      {/* Featured Teman */}
       <section className="py-16 md:py-24">
         <div className="container">
           <div className="flex items-center justify-between mb-12">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-2">
-                Pendamping <span className="text-gradient">Unggulan</span>
+                Teman <span className="text-gradient">Unggulan</span>
               </h2>
-              <p className="text-muted-foreground">Temukan pendamping terbaik untuk aktivitasmu</p>
+              <p className="text-muted-foreground">Temukan teman terbaik untuk aktivitasmu</p>
             </div>
             <Link to="/talents" className="hidden md:block">
               <Button variant="outline" className="group">
@@ -185,7 +185,7 @@ export default function Index() {
           <div className="mt-8 text-center md:hidden">
             <Link to="/talents">
               <Button variant="outline" className="group">
-                Lihat Semua Pendamping
+                Lihat Semua Teman
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
@@ -250,7 +250,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/talents">
                   <Button variant="secondary" size="lg" className="text-foreground">
-                    Pilih Pendamping Sekarang
+                    Pilih Teman Sekarang
                   </Button>
                 </Link>
                 <Link to="/login">
@@ -276,14 +276,14 @@ export default function Index() {
                 <span className="font-bold text-xl">RentMate</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Platform teman pendamping profesional #1 di Indonesia
+                Platform teman profesional #1 di Indonesia
               </p>
             </div>
 
             <div>
               <h4 className="font-bold mb-4">Navigasi</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/talents" className="hover:text-primary transition-colors">Pilih Pendamping</Link></li>
+                <li><Link to="/talents" className="hover:text-primary transition-colors">Pilih Teman</Link></li>
                 <li><Link to="/bookings" className="hover:text-primary transition-colors">Pemesanan Saya</Link></li>
                 <li><Link to="/chat" className="hover:text-primary transition-colors">Percakapan</Link></li>
                 <li><Link to="/profile" className="hover:text-primary transition-colors">Profil</Link></li>

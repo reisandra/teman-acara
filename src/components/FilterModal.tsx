@@ -1,10 +1,88 @@
-import { useState } from "react";
-import { X, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { cities, hobbies } from "@/data/mockData";
-import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
+
+// PERUBAHAN: Ambil kota dari localStorage atau gunakan default
+const cities = (() => {
+  try {
+    const savedCities = localStorage.getItem("rentmate_cities");
+    if (savedCities) {
+      return JSON.parse(savedCities);
+    }
+    
+    // Default cities jika tidak ada di localStorage
+    return [
+      "Jakarta",
+      "Surabaya",
+      "Bandung",
+      "Medan",
+      "Semarang",
+      "Makassar",
+      "Palembang",
+      "Tangerang",
+      "Depok",
+      "Bekasi",
+      "Yogyakarta",
+      "Denpasar",
+      "Malang",
+      "Bogor",
+      "Batam",
+      "Pekanbaru",
+      "Bandar Lampung",
+      "Padang",
+      "Manado",
+      "Balikpapan",
+      "Solo",
+      "Cirebon",
+      "Pontianak",
+      "Samarinda",
+      "Banjarmasin",
+    ];
+  } catch (error) {
+    console.error("Error loading cities from localStorage:", error);
+    return [];
+  }
+})();
+
+const hobbies = [
+  "Traveling",
+  "Nonton Film",
+  "Kuliner",
+  "Fotografi",
+  "Gaming",
+  "Musik",
+  "Olahraga",
+  "Membaca",
+  "Seni",
+  "Memasak",
+  "Hiking",
+  "Yoga",
+  "Renang",
+  "Basket",
+  "Badminton",
+  "Sepak Bola",
+  "Karaoke",
+  "Belanja",
+  "Kopi",
+  "Podcast",
+];
+
+// Tambahkan opsi untuk ketersediaan
+const AVAILABILITY_OPTIONS = [
+  { value: "online", label: "Online" },
+  { value: "offline", label: "Offline" },
+  { value: "both", label: "Online & Offline" }
+];
 
 interface FilterModalProps {
   isOpen: boolean;
@@ -15,41 +93,67 @@ interface FilterModalProps {
     gender: string;
     minAge: number;
     maxAge: number;
+    availability: string[];
   };
-  onApply: (filters: FilterModalProps["filters"]) => void;
+  onApply: (filters: any) => void;
 }
 
 export function FilterModal({ isOpen, onClose, filters, onApply }: FilterModalProps) {
-  const [localFilters, setLocalFilters] = useState(filters);
-  const [citySearch, setCitySearch] = useState("");
-  const [hobbySearch, setHobbySearch] = useState("");
-  const [expandedSection, setExpandedSection] = useState<string | null>("city");
+  // Buat local state untuk mengelola perubahan filter di modal
+  const [localFilters, setLocalFilters] = useState({
+    cities: [],
+    hobbies: [],
+    gender: "",
+    minAge: 18,
+    maxAge: 40,
+    availability: [], // Tambahkan default value untuk availability
+    ...filters // Spread operator untuk menimpa dengan nilai dari props
+  });
 
-  if (!isOpen) return null;
+  // PERUBAHAN: State untuk menyimpan daftar kota dari localStorage
+  const [availableCities, setAvailableCities] = useState<string[]>(cities);
 
-  const filteredCities = cities.filter((city) =>
-    city.toLowerCase().includes(citySearch.toLowerCase())
-  );
+  // Reset local filters ketika modal dibuka dengan props terbaru
+  useEffect(() => {
+    if (isOpen) {
+      setLocalFilters(filters);
+      // PERUBAHAN: Perbarui daftar kota dari localStorage setiap kali modal dibuka
+      try {
+        const savedCities = localStorage.getItem("rentmate_cities");
+        if (savedCities) {
+          setAvailableCities(JSON.parse(savedCities));
+        }
+      } catch (error) {
+        console.error("Error loading cities from localStorage:", error);
+      }
+    }
+  }, [isOpen, filters]);
 
-  const filteredHobbies = hobbies.filter((hobby) =>
-    hobby.toLowerCase().includes(hobbySearch.toLowerCase())
-  );
-
-  const toggleCity = (city: string) => {
-    setLocalFilters((prev) => ({
+  const handleCityChange = (city: string, checked: boolean) => {
+    setLocalFilters(prev => ({
       ...prev,
-      cities: prev.cities.includes(city)
-        ? prev.cities.filter((c) => c !== city)
-        : [...prev.cities, city],
+      cities: checked
+        ? [...prev.cities, city]
+        : prev.cities.filter(c => c !== city)
     }));
   };
 
-  const toggleHobby = (hobby: string) => {
-    setLocalFilters((prev) => ({
+  const handleHobbyChange = (hobby: string, checked: boolean) => {
+    setLocalFilters(prev => ({
       ...prev,
-      hobbies: prev.hobbies.includes(hobby)
-        ? prev.hobbies.filter((h) => h !== hobby)
-        : [...prev.hobbies, hobby],
+      hobbies: checked
+        ? [...prev.hobbies, hobby]
+        : prev.hobbies.filter(h => h !== hobby)
+    }));
+  };
+
+  // Tambahkan fungsi untuk menangani perubahan availability
+  const handleAvailabilityChange = (availability: string, checked: boolean) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      availability: checked
+        ? [...prev.availability, availability]
+        : prev.availability.filter(a => a !== availability)
     }));
   };
 
@@ -59,174 +163,150 @@ export function FilterModal({ isOpen, onClose, filters, onApply }: FilterModalPr
   };
 
   const handleReset = () => {
-    setLocalFilters({
+    const defaultFilters = {
       cities: [],
       hobbies: [],
       gender: "",
       minAge: 18,
       maxAge: 40,
-    });
+      availability: [],
+    };
+    setLocalFilters(defaultFilters);
   };
 
-  const SectionHeader = ({ title, section }: { title: string; section: string }) => (
-    <button
-      onClick={() => setExpandedSection(expandedSection === section ? null : section)}
-      className="flex items-center justify-between w-full py-3 font-semibold text-foreground"
-    >
-      {title}
-      {expandedSection === section ? (
-        <ChevronUp className="w-5 h-5 text-muted-foreground" />
-      ) : (
-        <ChevronDown className="w-5 h-5 text-muted-foreground" />
-      )}
-    </button>
-  );
+  // 🔥 PERBAIKAN: Tambahkan fungsi untuk menghitung jumlah filter yang aktif
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (localFilters.cities && localFilters.cities.length > 0) count++;
+    if (localFilters.hobbies && localFilters.hobbies.length > 0) count++;
+    if (localFilters.gender) count++;
+    if (localFilters.minAge !== 18 || localFilters.maxAge !== 40) count++;
+    if (localFilters.availability && localFilters.availability.length > 0) count++;
+    return count;
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm animate-fade-in">
-      <div className="fixed inset-x-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center">
-        <div className="bg-card rounded-t-3xl md:rounded-2xl max-h-[85vh] md:max-h-[80vh] md:max-w-lg md:w-full overflow-hidden shadow-2xl animate-slide-up">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b">
-            <h2 className="text-lg font-bold">Filter Talent</h2>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-
-          {/* Content */}
-          <div className="overflow-y-auto max-h-[60vh] p-4 space-y-4">
-            {/* City Filter */}
-            <div className="border-b pb-4">
-              <SectionHeader title="Kota" section="city" />
-              {expandedSection === "city" && (
-                <div className="space-y-3 animate-fade-in">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Cari kota..."
-                      value={citySearch}
-                      onChange={(e) => setCitySearch(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-                    {filteredCities.map((city) => (
-                      <Badge
-                        key={city}
-                        variant={localFilters.cities.includes(city) ? "default" : "outline"}
-                        className={cn(
-                          "cursor-pointer transition-all",
-                          localFilters.cities.includes(city) && "shadow-orange"
-                        )}
-                        onClick={() => toggleCity(city)}
-                      >
-                        {city}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Hobby Filter */}
-            <div className="border-b pb-4">
-              <SectionHeader title="Hobi & Skill" section="hobby" />
-              {expandedSection === "hobby" && (
-                <div className="space-y-3 animate-fade-in">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Cari hobi..."
-                      value={hobbySearch}
-                      onChange={(e) => setHobbySearch(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-                    {filteredHobbies.map((hobby) => (
-                      <Badge
-                        key={hobby}
-                        variant={localFilters.hobbies.includes(hobby) ? "default" : "outline"}
-                        className={cn(
-                          "cursor-pointer transition-all",
-                          localFilters.hobbies.includes(hobby) && "shadow-orange"
-                        )}
-                        onClick={() => toggleHobby(hobby)}
-                      >
-                        {hobby}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Gender Filter */}
-            <div className="border-b pb-4">
-              <SectionHeader title="Jenis Kelamin" section="gender" />
-              {expandedSection === "gender" && (
-                <div className="flex gap-2 animate-fade-in">
-                  {["", "Pria", "Wanita"].map((gender) => (
-                    <Badge
-                      key={gender || "all"}
-                      variant={localFilters.gender === gender ? "default" : "outline"}
-                      className={cn(
-                        "cursor-pointer transition-all px-4 py-2",
-                        localFilters.gender === gender && "shadow-orange"
-                      )}
-                      onClick={() => setLocalFilters((prev) => ({ ...prev, gender }))}
-                    >
-                      {gender || "Semua"}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Age Filter */}
-            <div>
-              <SectionHeader title="Usia" section="age" />
-              {expandedSection === "age" && (
-                <div className="flex items-center gap-3 animate-fade-in">
-                  <Input
-                    type="number"
-                    min={18}
-                    max={60}
-                    value={localFilters.minAge}
-                    onChange={(e) =>
-                      setLocalFilters((prev) => ({ ...prev, minAge: Number(e.target.value) }))
-                    }
-                    className="w-20 text-center"
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle>Filter Pencarian</DialogTitle>
+          {getActiveFiltersCount() > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {getActiveFiltersCount()} filter aktif
+            </Badge>
+          )}
+        </DialogHeader>
+        
+        <div className="space-y-6 mt-4">
+          {/* Gender Filter */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">Gender</Label>
+            <div className="flex gap-3">
+              {["Pria", "Wanita"].map((gender) => (
+                <label key={gender} className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox
+                    checked={localFilters.gender === gender}
+                    onCheckedChange={(checked) => {
+                      setLocalFilters(prev => ({
+                        ...prev,
+                        gender: checked ? gender : ""
+                      }));
+                    }}
                   />
-                  <span className="text-muted-foreground">-</span>
-                  <Input
-                    type="number"
-                    min={18}
-                    max={60}
-                    value={localFilters.maxAge}
-                    onChange={(e) =>
-                      setLocalFilters((prev) => ({ ...prev, maxAge: Number(e.target.value) }))
-                    }
-                    className="w-20 text-center"
-                  />
-                  <span className="text-muted-foreground text-sm">tahun</span>
-                </div>
-              )}
+                  <span className="text-sm">{gender}</span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex gap-3 p-4 border-t bg-card">
-            <Button variant="outline" className="flex-1" onClick={handleReset}>
-              Reset
+          {/* Age Range Filter */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">
+              Rentang Usia: {localFilters.minAge} - {localFilters.maxAge} tahun
+            </Label>
+            <Slider
+              value={[localFilters.minAge, localFilters.maxAge]}
+              onValueChange={(value) => {
+                setLocalFilters(prev => ({
+                  ...prev,
+                  minAge: value[0],
+                  maxAge: value[1],
+                }));
+              }}
+              max={65}
+              min={17}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>17</span>
+              <span>65</span>
+            </div>
+          </div>
+
+          {/* Availability Filter */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">Ketersediaan</Label>
+            <div className="grid grid-cols-1 gap-2">
+              {AVAILABILITY_OPTIONS.map((option) => (
+                <label key={option.value} className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox
+                    checked={localFilters.availability.includes(option.value)}
+                    onCheckedChange={(checked) => handleAvailabilityChange(option.value, checked as boolean)}
+                  />
+                  <span className="text-sm">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* City Filter - PERUBAHAN: Gunakan availableCities dari state */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">Kota</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {availableCities.map((city) => (
+                <label key={city} className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox
+                    checked={localFilters.cities.includes(city)}
+                    onCheckedChange={(checked) => handleCityChange(city, checked as boolean)}
+                  />
+                  <span className="text-sm">{city}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Hobby Filter */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">Hobi / Skill</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {hobbies.map((hobby) => (
+                <label key={hobby} className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox
+                    checked={localFilters.hobbies.includes(hobby)}
+                    onCheckedChange={(checked) => handleHobbyChange(hobby, checked as boolean)}
+                  />
+                  <span className="text-sm">{hobby}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between mt-6">
+          <Button variant="outline" onClick={handleReset}>
+            Reset
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Batal
             </Button>
-            <Button variant="hero" className="flex-1" onClick={handleApply}>
+            <Button onClick={handleApply}>
               Terapkan Filter
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

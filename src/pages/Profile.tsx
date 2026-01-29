@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   User,
   Edit3,
@@ -17,59 +17,183 @@ import {
   Bell,
   X,
   Save,
+  CheckCircle,
+  Eye,
+  RefreshCw, // Tambahkan ikon refresh
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { RatingModal } from "@/components/RatingModal";
 import { talents } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentUser, updateCurrentUser, UserProfile } from "@/lib/userStore";
+import { 
+  getCurrentUser, 
+  updateCurrentUser, 
+  UserProfile, 
+  markAllNotificationsRead
+} from "@/lib/userStore";
+import { getBookings } from "@/lib/bookingStore";
+import { dicebearAvatar } from "@/lib/utils";
 
-const mockBookings = [
-  {
-    id: "b1",
-    talentId: "1",
-    date: "2024-01-20",
-    time: "14:00",
-    duration: 2,
-    purpose: "Nongkrong / Ngobrol",
-    status: "completed",
-    total: 300000,
-  },
-  {
-    id: "b2",
-    talentId: "3",
-    date: "2024-01-25",
-    time: "19:00",
-    duration: 3,
-    purpose: "Dinner / Makan Malam",
-    status: "upcoming",
-    total: 390000,
-  },
-];
+const TOP_UP_OPTIONS = [50000, 100000, 250000];
 
 export default function Profile() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("bookings");
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState<UserProfile>(getCurrentUser);
   const [editData, setEditData] = useState<UserProfile>(getCurrentUser);
+  
+  // Photo Modal State
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState<number | null>(null);
+
+  // Transaction Dialog State
+  const [showTransactionDialog, setShowTransactionDialog] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+
+  // State untuk bookings yang diambil dari store
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const [ratingModal, setRatingModal] = useState<{
     isOpen: boolean;
     talentId: string;
     bookingId: string;
   }>({ isOpen: false, talentId: "", bookingId: "" });
   const [ratedBookings, setRatedBookings] = useState<string[]>([]);
+  const [ratedDetails, setRatedDetails] = useState<Record<string, { rating: number; comment: string; talentId: string }>>({});
+  const notifications = userData.notifications || [];
 
-  // Load user from store on mount
+  // Fungsi untuk memuat data booking
+  const loadUserBookings = useCallback(() => {
+    setIsLoadingBookings(true);
+    try {
+      // Ambil data booking dari bookingStore
+      const allBookings = getBookings();
+      const currentUser = getCurrentUser();
+      
+      console.log("Current user:", currentUser); // Debug log
+      console.log("All bookings:", allBookings); // Debug log
+      
+      // Coba beberapa kemungkinan field untuk identifikasi pengguna
+      let userBookings = [];
+      
+      // Coba dengan userId
+      userBookings = allBookings.filter(booking => booking.userId === currentUser.id);
+      console.log("Bookings filtered by userId:", userBookings.length);
+      
+      // Jika tidak ada hasil, coba dengan bookerId
+      if (userBookings.length === 0) {
+        userBookings = allBookings.filter(booking => booking.bookerId === currentUser.id);
+        console.log("Bookings filtered by bookerId:", userBookings.length);
+      }
+      
+      // Jika masih tidak ada hasil, coba dengan email
+      if (userBookings.length === 0) {
+        userBookings = allBookings.filter(booking => booking.userEmail === currentUser.email);
+        console.log("Bookings filtered by userEmail:", userBookings.length);
+      }
+      
+      // Jika masih tidak ada hasil, coba dengan kombinasi bookerId dan bookerType
+      if (userBookings.length === 0) {
+        userBookings = allBookings.filter(booking => 
+          booking.bookerId === currentUser.id && 
+          (booking.bookerType === 'user' || booking.bookerType === undefined)
+        );
+        console.log("Bookings filtered by bookerId and bookerType:", userBookings.length);
+      }
+      
+      // Log detail dari booking yang ditemukan
+      if (userBookings.length > 0) {
+        console.log("Sample booking data:", userBookings[0]);
+      }
+      
+      setBookings(userBookings);
+    } catch (error) {
+      console.error("Error loading user bookings:", error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat data booking. Silakan refresh halaman.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingBookings(false);
+      setIsRefreshing(false);
+    }
+  }, [toast]);
+
+  // Fungsi untuk refresh manual
+  const handleRefreshBookings = () => {
+    setIsRefreshing(true);
+    // Hapus cache yang mungkin ada
+    localStorage.removeItem("rentmate_bookings");
+    // Tambah sedikit delay untuk visual feedback
+    setTimeout(() => {
+      loadUserBookings();
+    }, 500);
+  };
+
+  // Load user from store on mount and subscribe
   useEffect(() => {
     const user = getCurrentUser();
     setUserData(user);
     setEditData(user);
-  }, []);
+    loadUserBookings(); // Muat data booking saat komponen dimuat
+    
+    try {
+      const stored = localStorage.getItem("rentmate_user_reviews");
+      if (stored) {
+        const arr = JSON.parse(stored) as Array<{ bookingId: string; rating: number; comment: string; talentId: string }>;
+        const map: Record<string, { rating: number; comment: string; talentId: string }> = {};
+        const ids: string[] = [];
+        arr.forEach((it) => {
+          map[it.bookingId] = { rating: it.rating, comment: it.comment, talentId: it.talentId };
+          ids.push(it.bookingId);
+        });
+        setRatedDetails(map);
+        setRatedBookings(ids);
+      }
+    } catch {}
+  }, [loadUserBookings, refreshTrigger]);
+
+  // Tambahkan event listener untuk update booking
+  useEffect(() => {
+    const handleBookingUpdate = () => {
+      console.log("Booking update detected in Profile, refreshing...");
+      loadUserBookings();
+    };
+
+    // Tambahkan event listener
+    window.addEventListener('bookingUpdated', handleBookingUpdate);
+    window.addEventListener('bookingCompleted', handleBookingUpdate);
+    window.addEventListener('bookingApproved', handleBookingUpdate);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('bookingUpdated', handleBookingUpdate);
+      window.removeEventListener('bookingCompleted', handleBookingUpdate);
+      window.removeEventListener('bookingApproved', handleBookingUpdate);
+    };
+  }, [loadUserBookings]);
+
+  useEffect(() => {
+    if (activeTab === "notifications" && notifications.some((n) => !n.read)) {
+      const updated = markAllNotificationsRead();
+      setUserData(updated);
+      setEditData(updated);
+    }
+  }, [activeTab]); 
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -82,6 +206,7 @@ export default function Profile() {
   const handleEditClick = () => {
     setEditData(userData);
     setIsEditing(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCancelEdit = () => {
@@ -100,11 +225,103 @@ export default function Profile() {
     });
   };
 
+  const handleLogout = () => {
+    // Clear user session simulation
+    // Since userStore returns default if empty, we just navigate to login
+    // In a real app we would clear token/storage
+    toast({
+      title: "Berhasil Keluar",
+      description: "Sampai jumpa kembali!",
+    });
+    navigate("/login");
+  };
+
+  // Photo Handling
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSavePhoto = () => {
+    if (photoPreview) {
+      const updated = updateCurrentUser({ photo: photoPreview });
+      setUserData(updated);
+      setEditData(updated);
+      setIsPhotoModalOpen(false);
+      setPhotoPreview(null);
+      toast({
+        title: "Foto Profil Diperbarui",
+        description: "Foto profil baru Anda telah disimpan.",
+      });
+    }
+  };
+
+  // Transaction Detail Handling
+  const handleViewTransactionDetails = (booking: any) => {
+    setSelectedTransaction(booking);
+    setShowTransactionDialog(true);
+  };
+
+  // Fungsi untuk refresh data booking
+  const refreshBookings = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  // Fungsi untuk navigasi ke chat
+  const handleNavigateToChat = (e: React.MouseEvent, booking: any) => {
+    e.stopPropagation();
+    
+    // Coba beberapa kemungkinan ID untuk routing chat
+    let chatId = booking.id; // Default ke booking ID
+    
+    // Jika ada chatId khusus, gunakan itu
+    if (booking.chatId) {
+      chatId = booking.chatId;
+    }
+    
+    console.log("Navigating to chat with ID:", chatId);
+    
+    // Navigasi ke halaman chat dengan ID yang sesuai
+    navigate(`/chat/${chatId}`);
+  };
+
   const menuItems = [
-    { icon: Bell, label: "Notifikasi", path: "#" },
-    { icon: Settings, label: "Pengaturan", path: "#" },
-    { icon: HelpCircle, label: "Bantuan", path: "#" },
-    { icon: FileText, label: "Syarat & Ketentuan", path: "#" },
+    { 
+      icon: Bell, 
+      label: "Notifikasi", 
+      action: () => {
+        setActiveTab("notifications");
+        if (notifications.some((n) => !n.read)) {
+          const updated = markAllNotificationsRead();
+          setUserData(updated);
+          setEditData(updated);
+        }
+      },
+      badge: notifications.filter(n => !n.read).length
+    },
+    { 
+      icon: Settings, 
+      label: "Pengaturan", 
+      action: () => {
+        handleEditClick();
+      }
+    },
+    { 
+      icon: HelpCircle, 
+      label: "Bantuan", 
+      path: "/faq" 
+    },
+    { 
+      icon: FileText, 
+      label: "Syarat & Ketentuan", 
+      path: "/syarat-ketentuan" 
+    },
   ];
 
   return (
@@ -113,14 +330,22 @@ export default function Profile() {
         {/* Profile Header */}
         <Card className="p-6 mb-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="relative">
+            <div className="relative group cursor-pointer" onClick={() => setIsPhotoModalOpen(true)}>
               <img
                 src={userData.photo}
                 alt={userData.name}
-                className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover ring-4 ring-primary/20"
+                className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover ring-4 ring-primary/20 transition-all group-hover:ring-primary/50"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = dicebearAvatar(userData.name, "Wanita", 128);
+                }}
               />
+              <div className="absolute inset-0 bg-black/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Camera className="w-8 h-8 text-white drop-shadow-md" />
+              </div>
               {isEditing && (
-                <button className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-orange">
+                <button className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-orange pointer-events-none"
+                  aria-label="Edit foto profil">
                   <Camera className="w-4 h-4" />
                 </button>
               )}
@@ -133,7 +358,7 @@ export default function Profile() {
                     <h1 className="text-2xl font-bold">{userData.name}</h1>
                     <Badge variant="secondary" className="gap-1">
                       <User className="w-3 h-3" />
-                      Pengguna
+                      {userData.preference === "online" ? "Online" : userData.preference === "offline" ? "Offline" : "Online & Offline"}
                     </Badge>
                   </div>
                   <p className="text-muted-foreground mb-1">@{userData.username}</p>
@@ -181,10 +406,11 @@ export default function Profile() {
                   
                   <div>
                     <label className="text-sm font-medium mb-2 block">Bio Singkat</label>
-                    <Input
+                    <Textarea
                       value={editData.bio}
                       onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
                       placeholder="Ceritakan tentang dirimu"
+                      className="resize-none"
                     />
                   </div>
 
@@ -208,7 +434,7 @@ export default function Profile() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Nomor Kontak (opsional)</label>
+                    <label className="text-sm font-medium mb-2 block">Nomor Kontak</label>
                     <Input
                       value={editData.phone}
                       onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
@@ -217,7 +443,7 @@ export default function Profile() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Preferensi Pertemuan</label>
+                    <label className="text-sm font-medium mb-2 block">Status / Preferensi Pertemuan</label>
                     <div className="flex gap-2">
                       {[
                         { value: "online", label: "Online" },
@@ -231,6 +457,7 @@ export default function Profile() {
                           onClick={() =>
                             setEditData({ ...editData, preference: option.value as "online" | "offline" | "both" })
                           }
+                          className="flex-1"
                         >
                           {option.label}
                         </Button>
@@ -239,24 +466,28 @@ export default function Profile() {
                   </div>
 
                   {/* Non-editable fields */}
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-2">Informasi yang tidak dapat diubah:</p>
-                    <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="pt-4 border-t bg-muted/20 p-4 rounded-lg">
+                    <p className="text-sm font-semibold mb-3">Informasi Akun (Tidak dapat diubah)</p>
+                    <div className="grid md:grid-cols-3 gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Email: </span>
-                        <span className="font-medium">{userData.email}</span>
+                        <span className="text-muted-foreground block mb-1">Email</span>
+                        <span className="font-medium bg-background px-2 py-1 rounded border block">{userData.email}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Role: </span>
+                        <span className="text-muted-foreground block mb-1">Role</span>
                         <Badge variant="secondary" className="gap-1">
                           <User className="w-3 h-3" />
                           Pengguna
                         </Badge>
                       </div>
+                      <div>
+                        <span className="text-muted-foreground block mb-1">ID Akun</span>
+                        <span className="font-mono text-xs bg-background px-2 py-1.5 rounded border block">{userData.id}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 sticky bottom-0 bg-background/95 backdrop-blur py-2 border-t mt-2">
                     <Button variant="hero" className="flex-1 gap-2" onClick={handleSaveProfile}>
                       <Save className="w-4 h-4" />
                       Simpan Perubahan
@@ -284,7 +515,7 @@ export default function Profile() {
                 <p className="text-2xl font-bold">{formatPrice(userData.wallet)}</p>
               </div>
             </div>
-            <Button variant="secondary" className="text-foreground">
+            <Button variant="secondary" className="text-foreground" onClick={() => setIsTopUpOpen(true)}>
               Isi Saldo
             </Button>
           </div>
@@ -292,125 +523,238 @@ export default function Profile() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-2 mb-6">
-            <TabsTrigger value="bookings">Riwayat Pemesanan</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-3 mb-6">
+            <TabsTrigger value="bookings">Riwayat</TabsTrigger>
+            <TabsTrigger value="notifications">Notifikasi</TabsTrigger>
             <TabsTrigger value="settings">Pengaturan</TabsTrigger>
           </TabsList>
 
+          {/* Bookings Tab */}
           <TabsContent value="bookings" className="space-y-4">
-            {mockBookings.map((booking) => {
-              const talent = talents.find((t) => t.id === booking.talentId);
-              if (!talent) return null;
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Riwayat Pemesanan</h2>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2" 
+                onClick={handleRefreshBookings}
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Refresh
+              </Button>
+            </div>
+            
+            {isLoadingBookings ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : bookings.length > 0 ? (
+              bookings.map((booking) => {
+                const talent = talents.find((t) => t.id === booking.talentId);
+                if (!talent) return null;
 
-              return (
-                <Card key={booking.id} hover className="p-4">
-                  <div className="flex gap-4">
-                    <img
-                      src={talent.photo}
-                      alt={talent.name}
-                      className="w-20 h-20 rounded-xl object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="font-bold">{talent.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {booking.purpose}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={
-                            booking.status === "completed"
-                              ? "success"
-                              : booking.status === "upcoming"
-                              ? "accent"
-                              : "secondary"
-                          }
-                        >
-                          {booking.status === "completed"
-                            ? "Selesai"
-                            : booking.status === "upcoming"
-                            ? "Akan Datang"
-                            : "Dibatalkan"}
-                        </Badge>
-                      </div>
-
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {new Date(booking.date).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {booking.time} • {booking.duration} jam
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                        <span className="font-bold text-primary">
-                          {formatPrice(booking.total)}
-                        </span>
-                        {booking.status === "completed" && !ratedBookings.includes(booking.id) && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="gap-1"
-                            onClick={() => setRatingModal({
-                              isOpen: true,
-                              talentId: booking.talentId,
-                              bookingId: booking.id,
-                            })}
+                return (
+                  <Card key={booking.id} hover className="p-4 cursor-pointer" onClick={() => handleViewTransactionDetails(booking)}>
+                    <div className="flex gap-4">
+                      <img
+                        src={talent.photo}
+                        alt={talent.name}
+                        className="w-20 h-20 rounded-xl object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = dicebearAvatar(talent.name, talent.gender as any, 128);
+                        }}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h3 className="font-bold">{talent.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {booking.purpose}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              booking.status === "completed"
+                                ? "success"
+                                : booking.status === "upcoming" || booking.approvalStatus === "approved"
+                                ? "accent"
+                                : "secondary"
+                            }
                           >
-                            <Star className="w-4 h-4" />
-                            Beri Penilaian
-                          </Button>
-                        )}
-                        {booking.status === "completed" && ratedBookings.includes(booking.id) && (
-                          <Badge variant="success" className="gap-1">
-                            <Star className="w-3 h-3 fill-current" />
-                            Sudah Dinilai
                           </Badge>
-                        )}
-                        {booking.status === "upcoming" && (
-                          <Link to={`/chat/${booking.talentId}`}>
-                            <Button size="sm">Obrolan</Button>
-                          </Link>
-                        )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {new Date(booking.date).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {booking.time} • {booking.duration} jam
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-primary">
+                              {formatPrice(booking.total)}
+                            </span>
+                            {(booking.status === "completed" || booking.approvalStatus === "completed") ? (
+                              !ratedBookings.includes(booking.id) ? (
+                                <Button 
+                                  variant="hero"
+                                  size="sm" 
+                                  className="gap-1 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRatingModal({
+                                      isOpen: true,
+                                      talentId: booking.talentId,
+                                      bookingId: booking.id,
+                                    });
+                                  }}
+                                >
+                                  <Star className="w-4 h-4" />
+                                  Beri Ulasan
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button size="sm" variant="outline" disabled>
+                                    Ulasan telah diberikan
+                                  </Button>
+                                  <div className="flex items-center gap-1 text-amber-500">
+                                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                    <span className="font-semibold">{ratedDetails[booking.id]?.rating}</span>
+                                  </div>
+                                </>
+                              )
+                            ) : (
+                              <Button size="sm" variant="outline" disabled>
+                                Belum dapat memberi ulasan
+                              </Button>
+                            )}
+                            {(booking.status === "upcoming" || booking.approvalStatus === "approved") && (
+                              <Button 
+                                size="sm"
+                                onClick={(e) => handleNavigateToChat(e, booking)}
+                              >
+                                Obrolan
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="gap-1 text-muted-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewTransactionDetails(booking);
+                              }}
+                            >
+                              <Eye className="w-4 h-4" />
+                              Lihat Detail
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
+                  </Card>
+                );
+              })
+            ) : (
+              <Card className="p-8 text-center">
+                <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Belum Ada Pemesanan</h3>
+                <p className="text-muted-foreground mb-4">
+                  Anda belum memiliki riwayat pemesanan.
+                </p>
+                <Button onClick={() => navigate("/talents")}>
+                  Cari Talent
+                </Button>
+              </Card>
+            )}
           </TabsContent>
 
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-4">
+             {notifications.length > 0 ? (
+                notifications.map((notif) => (
+                  <Card key={notif.id} className={`p-4 ${!notif.read ? 'bg-accent/10 border-l-4 border-l-primary' : ''}`}>
+                    <div className="flex items-start gap-4">
+                       <div className={`p-2 rounded-full ${notif.type === 'payment' ? 'bg-green-100 text-green-600' : notif.type === 'booking' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                          {notif.type === 'payment' ? <Wallet className="w-5 h-5" /> : notif.type === 'booking' ? <Calendar className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                       </div>
+                       <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                             <h4 className="font-semibold text-sm">{notif.title}</h4>
+                             <span className="text-xs text-muted-foreground">{notif.time}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{notif.message}</p>
+                          {notif.read && (
+                            <Badge variant="secondary" className="mt-2 text-xs">Sudah dibaca</Badge>
+                          )}
+                       </div>
+                    </div>
+                  </Card>
+                ))
+             ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                   Tidak ada notifikasi
+                </div>
+             )}
+          </TabsContent>
+
+          {/* Settings Tab (Menu) */}
           <TabsContent value="settings" className="space-y-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              return (
+              const content = (
                 <Card
                   key={item.label}
                   hover
                   className="p-4 flex items-center justify-between cursor-pointer"
+                  onClick={item.action}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center relative">
                       <Icon className="w-5 h-5 text-primary" />
+                      {item.badge ? (
+                         <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                           {item.badge}
+                         </span>
+                      ) : null}
                     </div>
                     <span className="font-medium">{item.label}</span>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </Card>
               );
+
+              if (item.path) {
+                return (
+                  <Link key={item.label} to={item.path} className="block">
+                    {content}
+                  </Link>
+                );
+              }
+
+              return content;
             })}
 
             <Card
               hover
-              className="p-4 flex items-center justify-between cursor-pointer text-destructive"
+              className="p-4 flex items-center justify-between cursor-pointer text-destructive mt-4"
+              onClick={handleLogout}
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
@@ -432,11 +776,221 @@ export default function Profile() {
             talentPhoto={talents.find((t) => t.id === ratingModal.talentId)?.photo || ""}
             bookingId={ratingModal.bookingId}
             onSubmit={(rating, comment) => {
-              console.log("Rating submitted:", { rating, comment, bookingId: ratingModal.bookingId });
+              const entry = { bookingId: ratingModal.bookingId, rating, comment, talentId: ratingModal.talentId };
               setRatedBookings((prev) => [...prev, ratingModal.bookingId]);
+              setRatedDetails((prev) => ({ ...prev, [ratingModal.bookingId]: { rating, comment, talentId: ratingModal.talentId } }));
+              try {
+                const stored = localStorage.getItem("rentmate_user_reviews");
+                const arr = stored ? JSON.parse(stored) : [];
+                arr.push(entry);
+                localStorage.setItem("rentmate_user_reviews", JSON.stringify(arr));
+              } catch {}
             }}
           />
         )}
+
+        {/* Photo Upload Modal */}
+        <Dialog open={isPhotoModalOpen} onOpenChange={setIsPhotoModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ganti Foto Profil</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-6 py-4">
+              <div className="relative">
+                <img
+                  src={photoPreview || userData.photo}
+                  alt="Preview"
+                  className="w-32 h-32 rounded-full object-cover ring-4 ring-primary/20"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = dicebearAvatar(userData.name, "Wanita", 128);
+                  }}
+                />
+              </div>
+              <div className="w-full max-w-xs">
+                <label className="block text-sm font-medium mb-2 text-center">
+                  Pilih Foto Baru
+                </label>
+                <Input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handlePhotoFileChange}
+                  className="cursor-pointer"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+               <Button variant="outline" onClick={() => { setIsPhotoModalOpen(false); setPhotoPreview(null); }}>
+                 Batal
+               </Button>
+               <Button onClick={handleSavePhoto} disabled={!photoPreview}>
+                 Simpan Foto
+               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Top Up Modal */}
+        <Dialog open={isTopUpOpen} onOpenChange={setIsTopUpOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Isi Saldo</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Pilih nominal untuk menambah saldo dompet Anda</p>
+              <div className="grid grid-cols-3 gap-3">
+                {TOP_UP_OPTIONS.map((amount) => (
+                  <Button
+                    key={amount}
+                    variant={topUpAmount === amount ? "hero" : "outline"}
+                    onClick={() => setTopUpAmount(amount)}
+                  >
+                    {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsTopUpOpen(false); setTopUpAmount(null); }}>
+                Batal
+              </Button>
+              <Button
+                onClick={() => {
+                  if (topUpAmount) {
+                    const updated = updateCurrentUser({ wallet: userData.wallet + topUpAmount });
+                    setUserData(updated);
+                    setEditData(updated);
+                    setIsTopUpOpen(false);
+                    setTopUpAmount(null);
+                    toast({
+                      title: "Saldo berhasil ditambahkan",
+                      description: `Saldo bertambah sebesar ${new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(topUpAmount)}`,
+                    });
+                  }
+                }}
+                disabled={!topUpAmount}
+              >
+                Konfirmasi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog Detail Transaksi */}
+        <Dialog open={showTransactionDialog} onOpenChange={(open) => !open && setShowTransactionDialog(false)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Detail Transaksi
+              </DialogTitle>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <img 
+                      src={userData.photo} 
+                      alt={userData.name} 
+                      className="w-12 h-12 rounded-full object-cover border-2 border-background shadow" 
+                    />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Pengguna</p>
+                      <h3 className="font-bold">{userData.name}</h3>
+                    </div>
+                  </div>
+                  <div className="text-center text-muted-foreground">
+                    <div className="w-8 h-[2px] bg-border mx-auto mb-1" />
+                    <span className="text-xs">memesan</span>
+                    <div className="w-8 h-[2px] bg-border mx-auto mt-1" />
+                  </div>
+                  <div className="flex items-center gap-3 flex-1 justify-end">
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Teman</p>
+                      <h3 className="font-bold">{talents.find(t => t.id === selectedTransaction.talentId)?.name}</h3>
+                    </div>
+                    <img 
+                      src={talents.find(t => t.id === selectedTransaction.talentId)?.photo} 
+                      alt={talents.find(t => t.id === selectedTransaction.talentId)?.name} 
+                      className="w-12 h-12 rounded-full object-cover border-2 border-background shadow" 
+                    />
+                  </div>
+                </div>
+                
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="mb-4 pb-4 border-b">
+                    <p className="text-xs text-muted-foreground mb-2">ID Transaksi</p>
+                    <div className="bg-background rounded p-3 border">
+                      <p className="font-mono text-sm break-all">{selectedTransaction.id}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Tujuan</p>
+                      <p className="font-medium">{selectedTransaction.purpose}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Tanggal</p>
+                      <p className="font-medium flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(selectedTransaction.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Waktu & Durasi</p>
+                      <p className="font-medium flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {selectedTransaction.time} • {selectedTransaction.duration} jam
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total Pembayaran</p>
+                      <p className="font-bold text-primary text-lg">{formatPrice(selectedTransaction.total)}</p>
+                    </div>
+                  </div>
+                </div>
+                      
+                {selectedTransaction.paymentProof && (
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <p className="text-sm font-semibold mb-2">Detail Pembayaran</p>
+                    <div className="grid md:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Metode</p>
+                        <p className="font-medium">{selectedTransaction.paymentMethod ? selectedTransaction.paymentMethod.toUpperCase() : "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Kode Pembayaran</p>
+                        <p className="font-medium">{selectedTransaction.paymentCode}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Waktu Transfer</p>
+                        <p className="font-medium">{selectedTransaction.transferTime}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Jumlah</p>
+                        <p className="font-medium">{formatPrice(selectedTransaction.transferAmount)}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3">
+                      <p className="text-muted-foreground text-sm mb-1">Bukti Transfer</p>
+                      <img 
+                        src={selectedTransaction.paymentProof} 
+                        alt="Bukti Transfer" 
+                        className="w-48 rounded-lg border shadow cursor-pointer" 
+                        onClick={() => window.open(selectedTransaction.paymentProof, "_blank")} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowTransactionDialog(false)}>Tutup</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

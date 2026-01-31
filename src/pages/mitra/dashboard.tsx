@@ -109,31 +109,31 @@ export default function MitraDashboard() {
   // --- FUNGSI YANG DIPERBAIKI & DIOPTIMASI ---
 
   const loadBookings = useCallback(async (mode: MitraRole = "talent") => {
-    try {
-      const currentMitraData = mode === "talent" ? mitraAsTalent : mitraAsBooker;
-      if (!currentMitraData || !currentMitraData.id) {
-        console.log(`MitraDashboard: No current mitra for mode ${mode}, cannot load bookings.`);
-        setBookings([]);
-        setChats([]);
-        return;
-      }
+  try {
+    const currentMitraData = mode === "talent" ? mitraAsTalent : mitraAsBooker;
+    if (!currentMitraData || !currentMitraData.id) {
+      console.log(`MitraDashboard: No current mitra for mode ${mode}, cannot load bookings.`);
+      setBookings([]);
+      setChats([]);
+      return;
+    }
 
-      console.log(`MitraDashboard: Loading bookings for mode: ${mode}`);
-      const allBookings = getBookings();
+    console.log(`MitraDashboard: Loading bookings for mode: ${mode}`);
+    const allBookings = await getBookings(); // <<<< TAMBAHKAN `await`
 
-      let mitraBookings: SharedBooking[] = [];
-      if (mode === "talent") {
-        mitraBookings = allBookings.filter(
-          (booking) => booking.talentId === currentMitraData.talentId && booking.approvalStatus === "approved"
-        );
-      } else {
-        mitraBookings = allBookings.filter(
-          (booking) => 
-            booking.bookerId === currentMitraData.talentId && 
-            booking.bookerType === "mitra" && 
-            booking.approvalStatus === "approved"
-        );
-      }
+    let mitraBookings: SharedBooking[] = [];
+    if (mode === "talent") {
+      mitraBookings = allBookings.filter(
+        (booking) => booking.talentId === currentMitraData.talentId && booking.approvalStatus === "approved"
+      );
+    } else {
+      mitraBookings = allBookings.filter(
+        (booking) => 
+          booking.bookerId === currentMitraData.talentId && 
+          booking.bookerType === "mitra" && 
+          booking.approvalStatus === "approved"
+      );
+    }
       
       const transformedChats: Chat[] = mitraBookings.map((booking) => {
         const chatSession = getChatSessionByBookingId(booking.id);
@@ -247,7 +247,7 @@ export default function MitraDashboard() {
     }
   }, [toast, mitraAsTalent, mitraAsBooker]);
 
-  const updateStats = useCallback(() => {
+  const updateStats = useCallback(async () => {
     try {
       const currentMitraData = activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
       if (!currentMitraData || !currentMitraData.id) {
@@ -258,7 +258,7 @@ export default function MitraDashboard() {
       const totalRevenue = calculateMitraEarnings(currentMitraData.talentId, activeMode === "talent");
       setEarnings(totalRevenue);
       
-      const allBookings = getBookings();
+      const allBookings = await getBookings();
       let mitraBookings: SharedBooking[] = [];
 
       if (activeMode === "talent") {
@@ -307,22 +307,23 @@ export default function MitraDashboard() {
     }
   }, [activeMode, mitraAsTalent, mitraAsBooker]);
 
-  const handleRefresh = useCallback(() => {
-    if (!isOnline) {
-      toast({ title: "Tidak Ada Koneksi", description: "Tidak dapat memperbarui data saat offline.", variant: "destructive" });
-      return;
-    }
-    setIsRefreshing(true);
-    localStorage.removeItem("rentmate_chats");
-    localStorage.removeItem("rentmate_bookings");
-    localStorage.setItem("rentmate_last_data_update", Date.now().toString());
-    
-    loadBookings(activeMode).then(() => {
-      updateStats();
-      setIsRefreshing(false);
-      toast({ title: "Data Diperbarui", description: "Data percakapan berhasil diperbarui" });
-    });
-  }, [isOnline, toast, loadBookings, updateStats, activeMode]);
+  const handleRefresh = useCallback(async () => { // <<<< JADIKAN `async`
+  if (!isOnline) {
+    toast({ title: "Tidak Ada Koneksi", description: "Tidak dapat memperbarui data saat offline.", variant: "destructive" });
+    return;
+  }
+  setIsRefreshing(true);
+  localStorage.removeItem("rentmate_chats");
+  localStorage.removeItem("rentmate_bookings");
+  localStorage.setItem("rentmate_last_data_update", Date.now().toString());
+  
+  await loadBookings(activeMode);
+  await updateStats(); 
+  
+  setIsRefreshing(false);
+  toast({ title: "Data Diperbarui", description: "Data percakapan berhasil diperbarui" });
+}, [isOnline, toast, loadBookings, updateStats, activeMode]);
+
 
   const markMessagesAsRead = useCallback((bookingId: string) => {
     console.log("MitraDashboard: Marking messages as read for booking:", bookingId);
@@ -396,15 +397,17 @@ export default function MitraDashboard() {
     };
   }, [navigate, toast, activeMode, loadBookings, updateStats]);
 
-  // Effect untuk memuat data awal dan saat mode berubah
-  useEffect(() => {
+
+useEffect(() => {
+  const loadData = async () => {
     console.log(`MitraDashboard: Active mode changed to ${activeMode}. Reloading data.`);
     setIsLoading(true);
-    loadBookings(activeMode).then(() => {
-      updateStats();
-      setIsLoading(false);
-    });
-  }, [activeMode, loadBookings, updateStats]);
+    await loadBookings(activeMode);
+    await updateStats(); 
+    setIsLoading(false);
+  };
+  loadData();
+}, [activeMode, loadBookings, updateStats]);
 
   // PERBAIKAN: useEffect untuk berlangganan booking yang selesai
   useEffect(() => {

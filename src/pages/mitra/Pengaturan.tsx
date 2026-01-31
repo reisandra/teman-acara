@@ -16,7 +16,8 @@ import {
   TrendingUp,
   ArrowLeft,
   FileText,
-  Eye
+  Eye,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,25 +71,37 @@ export default function Pengaturan() {
     }
   };
 
-  const calculatePaymentSplit = (totalAmount: number, commissionPercentage: number) => {
-    const appAmount = Math.round(totalAmount * (commissionPercentage / 100));
-    const mitraAmount = totalAmount - appAmount;
-    
-    return {
-      appAmount,
-      mitraAmount,
-      totalAmount,
-      commissionPercentage
-    };
-  };
+  const calculatePaymentSplit = (totalAmount: number | string, commissionPercentage: number) => {
+  // PASTIKAN totalAmount selalu angka
+  const amount = parseFloat(totalAmount) || 0;
 
-  // Fungsi helper untuk menghitung pendapatan mitra setelah komisi
-  const calculateMitraEarning = (total: number) => {
-    if (!total) return 0;
-    const commissionPercentage = getAppCommission();
-    const paymentSplit = calculatePaymentSplit(total, commissionPercentage);
-    return paymentSplit.mitraAmount;
+  if (amount === 0) {
+    return {
+      appAmount: 0,
+      mitraAmount: 0,
+      totalAmount: 0,
+      commissionPercentage,
+    };
+  }
+
+  const appAmount = Math.round(amount * (commissionPercentage / 100));
+  const mitraAmount = amount - appAmount;
+  
+  return {
+    appAmount,
+    mitraAmount,
+    totalAmount: amount,
+    commissionPercentage,
   };
+};
+
+const calculateMitraEarning = (total: number | string) => { 
+  const totalAmount = parseFloat(total) || 0; 
+  if (totalAmount === 0) return 0; 
+  const commissionPercentage = getAppCommission();
+  const paymentSplit = calculatePaymentSplit(totalAmount, commissionPercentage);
+  return paymentSplit.mitraAmount;
+};
 
   // Fungsi untuk membuka dialog detail transaksi
   const handleViewTransactionDetails = (booking: any) => {
@@ -136,17 +149,17 @@ export default function Pengaturan() {
     });
   }, []);
 
-  // Memuat data mitra dan booking
-  useEffect(() => {
+  
+useEffect(() => {
+  const loadData = async () => {
     const mitra = getCurrentMitra();
     if (mitra) {
       setCurrentMitra(mitra);
-      
-      // PERBAIKAN: Gunakan fungsi yang lebih tepat untuk mendapatkan booking mitra
-      const allBookings = getBookings();
-      const mitraBookings = allBookings.filter(booking => 
-        booking.talentId === mitra.talentId
-      );
+
+      const allBookings = await getBookings() || [];
+      const mitraBookings = Array.isArray(allBookings) 
+        ? allBookings.filter(booking => booking.talentId === mitra.talentId)
+        : [];
       
       console.log("Mitra bookings loaded:", mitraBookings);
       setBookings(mitraBookings);
@@ -154,7 +167,10 @@ export default function Pengaturan() {
       // Calculate earnings
       calculateEarnings(mitraBookings);
     }
-  }, [refreshTrigger, calculateEarnings]);
+  };
+  
+  loadData();
+}, [refreshTrigger, calculateEarnings]);
 
   // Tambahkan event listener untuk update booking
   useEffect(() => {
@@ -463,129 +479,23 @@ export default function Pengaturan() {
 
         {activeTab === "pendapatan" && (
           <div className="space-y-4">
-            {/* PERBAIKAN: Tambahkan tombol refresh */}
+            {/* Header dengan tombol refresh */}
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Pendapatan Anda</h2>
-              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRefresh} 
+                disabled={isRefreshing}
+                className="gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Memperbarui...' : 'Perbarui Data'}
+              </Button>
             </div>
             
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <Card className="p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-100 text-sm">Total Pendapatan</p>
-                    <p className="text-2xl font-bold">{formatPrice(earnings.total)}</p>
-                  </div>
-                  <DollarSign className="w-10 h-10 text-blue-200" />
-                </div>
-              </Card>
-              
-              <Card className="p-6 bg-gradient-to-r from-green-500 to-green-600 text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-green-100 text-sm">Pendapatan Bulan Ini</p>
-                    <p className="text-2xl font-bold">{formatPrice(earnings.thisMonth)}</p>
-                  </div>
-                  <TrendingUp className="w-10 h-10 text-green-200" />
-                </div>
-              </Card>
-            </div>
-
-            {/* PERBAIKAN: Gunakan komponen EarningsDetails yang sudah diimport */}
+            {/* Gunakan komponen EarningsDetails yang sudah diimport */}
             <EarningsDetails isTalentMode={true} />
-            
-            {/* Detailed Earnings */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Detail Pendapatan</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <DollarSign className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Pendapatan Selesai</p>
-                      <p className="text-sm text-muted-foreground">
-                        {earnings.completed} pemesanan selesai
-                      </p>
-                    </div>
-                  </div>
-                  <p className="font-semibold">{formatPrice(earnings.total)}</p>
-                </div>
-                
-                <div className="flex items-center justify-between pb-3 border-b">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-yellow-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Pendapatan Tertunda</p>
-                      <p className="text-sm text-muted-foreground">
-                        Akan dibayar setelah pemesanan selesai
-                      </p>
-                    </div>
-                  </div>
-                  <p className="font-semibold">{formatPrice(earnings.pending)}</p>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Total Estimasi</p>
-                      <p className="text-sm text-muted-foreground">
-                        Pendapatan selesai + tertunda
-                      </p>
-                    </div>
-                  </div>
-                  <p className="font-semibold">{formatPrice(earnings.total + earnings.pending)}</p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Earnings History */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Riwayat Pendapatan</h3>
-              
-              {completedBookings.length > 0 ? (
-                <div className="space-y-3">
-                  {completedBookings
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                    .map((booking) => {
-                      const commissionPercentage = getAppCommission();
-                      const paymentSplit = calculatePaymentSplit(booking.total || 0, commissionPercentage);
-                      
-                      return (
-                        <div key={booking.id} className="flex items-center justify-between pb-3 border-b last:border-0 cursor-pointer hover:bg-muted/30 p-2 rounded transition-colors"
-                          onClick={() => handleViewTransactionDetails(booking)}>
-                          <div>
-                            <p className="font-medium">{booking.userName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDate(booking.date)} • {booking.time} • {booking.duration} jam
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-green-600">{formatPrice(paymentSplit.mitraAmount)}</p>
-                            <p className="text-xs text-muted-foreground">Total: {formatPrice(booking.total)}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <DollarSign className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Belum Ada Pendapatan</h3>
-                  <p className="text-muted-foreground">
-                    Anda belum memiliki pendapatan dari pemesanan yang selesai.
-                  </p>
-                </div>
-              )}
-            </Card>
           </div>
         )}
         

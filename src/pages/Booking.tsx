@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -32,11 +32,11 @@ import {
   updateBookingPayment, 
   SharedBooking, 
   updateBookingRating,
-  getCurrentUserOrMitra
+  getCurrentUserOrMitra // 🔥 PERBAIKAN: Typo 'Mita' menjadi 'Mitra'
 } from "@/lib/bookingStore";
 import { getCurrentUser } from "@/lib/userStore";
 import { createBooking } from "@/lib/bookings";
-import { isTimeSlotBooked } from '@/lib/bookingStore';
+// Fungsi isTimeSlotBooked tidak lagi digunakan di sini karena sudah digantikan dengan logika client-side
 import { getAllVerifiedTalents } from "@/lib/mitraStore";
 
 type BookingStatus = "draft" | "pending_payment" | "pending_approval" | "approved" | "completed" | "rejected";
@@ -49,7 +49,6 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-// Fungsi untuk mengubah 3 digit terakhir nominal menjadi angka acak
 const getRandomizedAmount = (amount: number): number => {
   const amountStr = amount.toString();
   if (amount < 1000) return amount;
@@ -58,10 +57,8 @@ const getRandomizedAmount = (amount: number): number => {
   return parseInt(prefix + randomSuffix);
 };
 
-// Fungsi untuk masking nomor rekening tanpa mengubah angka asli
 const maskBankAccount = (accountNumber: string): string => {
   if (!accountNumber || accountNumber.length < 3) return accountNumber;
-  // Kembalikan nomor rekening asli tanpa perubahan
   return accountNumber;
 };
 
@@ -90,33 +87,9 @@ export default function Booking() {
   // State untuk tujuan kustom
   const [customPurpose, setCustomPurpose] = useState("");
 
-  // Load semua talent saat komponen dimuat
-  useEffect(() => {
-    const loadTalents = async () => {
-      try {
-        const talents = await getAllVerifiedTalents();
-        setAllTalents(talents);
-        
-        // Cari talent berdasarkan ID
-        const foundTalent = talents.find((t) => t.id === id);
-        setDisplayTalent(foundTalent);
-      } catch (error) {
-        console.error("Error loading talents:", error);
-        // Fallback ke mock data jika gagal
-        const foundTalent = talents.find((t) => t.id === id);
-        setDisplayTalent(foundTalent);
-      } finally {
-        setIsLoadingTalent(false);
-        setIsInitialLoading(false);
-      }
-    };
-    
-    if (id) {
-      loadTalents();
-    } else {
-      setIsInitialLoading(false);
-    }
-  }, [id]);
+  // 🔥 PERBAIKAN PERFORMA: State untuk menyimpan booking yang sudah disetujui di tanggal tertentu
+  const [approvedBookingsForDate, setApprovedBookingsForDate] = useState<SharedBooking[]>([]);
+  const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -178,11 +151,7 @@ export default function Booking() {
     }
 
     const storageKey = getPaymentCodeStorageKey(currentUser.data.id, id, bookingData.date, bookingData.time);
-    
-    // Prioritaskan kode yang sudah ada di localStorage
     let code = localStorage.getItem(storageKey);
-
-    // Jika belum ada, buat yang baru dan simpan ke localStorage
     if (!code) {
       const year = new Date().getFullYear();
       const random = Math.random().toString(36).substr(2, 5).toUpperCase();
@@ -193,179 +162,209 @@ export default function Booking() {
     return code;
   };
 
-  // Di dalam komponen Booking, perbarui fungsi generateTimeSlots
-  const generateTimeSlots = () => {
+  // 🔥 PERFORMA: Gunakan useMemo agar daftar jam tidak dihitung ulang setiap render
+  const timeSlots = useMemo(() => {
     const slots = [];
-    
-    // Pagi (08:00 - 11:00)
-    for (let hour = 8; hour < 12; hour++) {
+    for (let hour = 8; hour < 22; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         const formattedHour = hour.toString().padStart(2, '0');
         const formattedMinute = minute.toString().padStart(2, '0');
         slots.push(`${formattedHour}:${formattedMinute}`);
       }
     }
-    
-    // Siang (12:00 - 15:00)
-    for (let hour = 12; hour < 15; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const formattedHour = hour.toString().padStart(2, '0');
-        const formattedMinute = minute.toString().padStart(2, '0');
-        slots.push(`${formattedHour}:${formattedMinute}`);
-      }
-    }
-    
-    // Sore (15:00 - 18:00)
-    for (let hour = 15; hour < 18; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const formattedHour = hour.toString().padStart(2, '0');
-        const formattedMinute = minute.toString().padStart(2, '0');
-        slots.push(`${formattedHour}:${formattedMinute}`);
-      }
-    }
-    
-    // Malam (18:00 - 21:00)
-    for (let hour = 18; hour < 22; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const formattedHour = hour.toString().padStart(2, '0');
-        const formattedMinute = minute.toString().padStart(2, '0');
-        slots.push(`${formattedHour}:${formattedMinute}`);
-      }
-    }
-    
     return slots;
+  }, []); // Kosong karena tidak bergantung pada props/state
+
+  // 🔥 PERFORMA: Fungsi helper untuk mengecek overlap, dijalankan di client-side
+  const isTimeSlotBookedClientSide = (time: string) => {
+    if (!approvedBookingsForDate.length || !bookingData.date) return false;
+
+    const newStartTime = new Date(`${bookingData.date}T${time}`);
+    const newEndTime = new Date(newStartTime.getTime() + bookingData.duration * 60 * 60 * 1000);
+    
+    return approvedBookingsForDate.some(booking => {
+      const bookingStartTime = new Date(`${booking.date}T${booking.time}`);
+      const bookingEndTime = new Date(bookingStartTime.getTime() + booking.duration * 60 * 60 * 1000);
+      
+      return (
+        (newStartTime >= bookingStartTime && newStartTime < bookingEndTime) ||
+        (newEndTime > bookingStartTime && newEndTime <= bookingEndTime) ||
+        (newStartTime <= bookingStartTime && newEndTime >= bookingEndTime)
+      );
+    });
   };
 
-  // Di dalam komponen Booking, ganti useEffect pertama Anda dengan ini:
+  // 🔥 PERBAIKAN PERFORMA: useEffect untuk mengambil booking yang disetujui di satu tanggal
   useEffect(() => {
-    if (!id) return;
-
-    const currentUser = getCurrentUserOrMitra();
-    if (!currentUser) {
-      navigate("/login");
-      return;
-    }
-    
-    const allBookings = getBookings();
-    const now = new Date();
-
-    // Cari booking yang AKTIF (masih akan datang)
-    const existingBooking = allBookings.find((b) => {
-      // 1. Pastikan booking ini milik user dan talent yang bersangkutan
-      if (b.bookerId !== currentUser.data.id || b.talentId !== id || b.approvalStatus === "rejected") {
-        return false;
-      }
-      
-      // 2. Cek apakah waktu booking sudah lewat
-      const startTime = new Date(`${b.date}T${b.time}`);
-      const endTime = new Date(startTime.getTime() + b.duration * 60 * 60 * 1000);
-      
-      // 3. Hanya anggap sebagai "aktif" jika booking belum berakhir
-      return endTime > now;
-    });
-
-    if (!existingBooking) {
-      // Reset state jika tidak ada booking aktif
-      setCurrentBookingId(null);
-      setBookingStatus("draft");
-      setStep(1);
-      
-      // Coba ambil kode dari localStorage untuk booking yang sedang dibuat
-      const potentialCode = getOrCreateStablePaymentCode();
-      if (potentialCode) {
-        setPaymentCode(potentialCode);
-      } else {
-        setPaymentCode("");
-      }
-      return;
-    }
-
-    // Simpan data booking untuk digunakan saat rating
-    setCurrentBooking(existingBooking);
-    setCurrentBookingId(existingBooking.id);
-    setBookingData({
-      duration: existingBooking.duration,
-      purpose: existingBooking.purpose,
-      type: existingBooking.type,
-      date: existingBooking.date,
-      time: existingBooking.time,
-      notes: existingBooking.notes || "",
-    });
-
-    // Gunakan payment code yang sudah ada dari booking
-    if (existingBooking.paymentCode) {
-      setPaymentCode(existingBooking.paymentCode);
-    } else {
-      const fallbackCode = getOrCreateStablePaymentCode();
-      setPaymentCode(fallbackCode);
-    }
-
-    // Prioritaskan status pembayaran dan persetujuan
-    if (existingBooking.paymentStatus === "pending" && !existingBooking.paymentProof) {
-      setBookingStatus("pending_payment");
-      setStep(3);
-      return;
-    }
-
-    if (existingBooking.approvalStatus === "pending_approval") {
-      setBookingStatus("pending_approval");
-      setStep(4);
-      return;
-    }
-
-    // Jika statusnya approved, langsung ke step 5 (Chat)
-    if (existingBooking.approvalStatus === "approved") {
-      setBookingStatus("approved");
-      setStep(5); // Langsung ke step 5 (Chat)
-      return;
-    }
-    
-    // Tambahkan logika untuk status "completed" jika diperlukan
-    if (existingBooking.date && existingBooking.time && existingBooking.duration) {
-      const startTime = new Date(`${existingBooking.date}T${existingBooking.time}`);
-      const endTime = new Date(startTime.getTime() + existingBooking.duration * 60 * 60 * 1000);
-      
-      if (endTime < now && existingBooking.approvalStatus === "approved") {
-        setBookingStatus("completed");
-        setStep(5); // Tetap di step 5 untuk chat atau rating
+    const fetchApprovedBookings = async () => {
+      if (!id || !bookingData.date) {
+        setApprovedBookingsForDate([]);
         return;
       }
-    }
-  }, [id]); // Dependency tetap [id]
 
-  // Bersihkan localStorage jika status berubah atau booking dibatalkan
+      setIsLoadingBookedSlots(true);
+      try {
+        const allBookings = await getBookings();
+        const filtered = allBookings.filter(b => 
+          b.talentId === id && 
+          b.date === bookingData.date && 
+          b.approvalStatus === 'approved'
+        );
+        setApprovedBookingsForDate(filtered);
+      } catch (error) {
+        console.error("Error fetching approved bookings:", error);
+        setApprovedBookingsForDate([]);
+      } finally {
+        setIsLoadingBookedSlots(false);
+      }
+    };
+
+    fetchApprovedBookings();
+  }, [id, bookingData.date]); // Hanya bergantung pada id dan tanggal
+
+  // Load semua talent saat komponen dimuat
+  useEffect(() => {
+    const loadTalents = async () => {
+      try {
+        const talents = await getAllVerifiedTalents();
+        setAllTalents(talents);
+        const foundTalent = talents.find((t) => t.id === id);
+        setDisplayTalent(foundTalent);
+      } catch (error) {
+        console.error("Error loading talents:", error);
+        const foundTalent = talents.find((t) => t.id === id);
+        setDisplayTalent(foundTalent);
+      } finally {
+        setIsLoadingTalent(false);
+        setIsInitialLoading(false);
+      }
+    };
+    
+    if (id) {
+      loadTalents();
+    } else {
+      setIsInitialLoading(false);
+    }
+  }, [id]);
+
+  // 🔥 PERBAIKAN: useEffect untuk memeriksa booking yang ada
+  useEffect(() => {
+    const fetchAndProcessBookings = async () => {
+      if (!id) return;
+
+      const currentUser = getCurrentUserOrMitra();
+      if (!currentUser) {
+        navigate("/login");
+        return;
+      }
+      
+      // 🔥 PERBAIKAN: Tambahkan await saat memanggil getBookings()
+      const allBookings = await getBookings(); 
+      const now = new Date();
+
+      const existingBooking = allBookings.find((b) => {
+        if (b.bookerId !== currentUser.data.id || b.talentId !== id || b.approvalStatus === "rejected") {
+          return false;
+        }
+        
+        const startTime = new Date(`${b.date}T${b.time}`);
+        const endTime = new Date(startTime.getTime() + b.duration * 60 * 60 * 1000);
+        
+        return endTime > now;
+      });
+
+      if (!existingBooking) {
+        setCurrentBookingId(null);
+        setBookingStatus("draft");
+        setStep(1);
+        
+        const potentialCode = getOrCreateStablePaymentCode();
+        if (potentialCode) {
+          setPaymentCode(potentialCode);
+        } else {
+          setPaymentCode("");
+        }
+        return;
+      }
+
+      setCurrentBooking(existingBooking);
+      setCurrentBookingId(existingBooking.id);
+      setBookingData({
+        duration: existingBooking.duration,
+        purpose: existingBooking.purpose,
+        type: existingBooking.type,
+        date: existingBooking.date,
+        time: existingBooking.time,
+        notes: existingBooking.notes || "",
+      });
+
+      if (existingBooking.paymentCode) {
+        setPaymentCode(existingBooking.paymentCode);
+      } else {
+        const fallbackCode = getOrCreateStablePaymentCode();
+        setPaymentCode(fallbackCode);
+      }
+
+      if (existingBooking.paymentStatus === "pending" && !existingBooking.paymentProof) {
+        setBookingStatus("pending_payment");
+        setStep(3);
+        return;
+      }
+
+      if (existingBooking.approvalStatus === "pending_approval") {
+        setBookingStatus("pending_approval");
+        setStep(4);
+        return;
+      }
+
+      if (existingBooking.approvalStatus === "approved") {
+        setBookingStatus("approved");
+        setStep(5);
+        return;
+      }
+      
+      if (existingBooking.date && existingBooking.time && existingBooking.duration) {
+        const startTime = new Date(`${existingBooking.date}T${existingBooking.time}`);
+        const endTime = new Date(startTime.getTime() + existingBooking.duration * 60 * 60 * 1000);
+        
+        if (endTime < now && existingBooking.approvalStatus === "approved") {
+          setBookingStatus("completed");
+          setStep(5);
+          return;
+        }
+      }
+    };
+
+    fetchAndProcessBookings();
+  }, [id, navigate]);
+
   useEffect(() => {
     const currentUser = getCurrentUserOrMitra();
     if (!currentUser || !id || !bookingData.date || !bookingData.time) return;
 
     const storageKey = getPaymentCodeStorageKey(currentUser.data.id, id, bookingData.date, bookingData.time);
 
-    // Jika booking selesai, ditolak, atau pengguna kembali ke draft dari status yang lebih tinggi
     if (bookingStatus === 'completed' || bookingStatus === 'rejected' || (bookingStatus === 'draft' && currentBookingId)) {
       localStorage.removeItem(storageKey);
     }
   }, [bookingStatus, currentBookingId, id, bookingData.date, bookingData.time]);
 
-  // Perbaiki logika subscribe to booking updates
   useEffect(() => {
     if (!currentBookingId) return;
 
-    const checkStatus = () => {
-      const booking = getBookingById(currentBookingId);
+    const checkStatus = async () => { // Buat async
+      const booking = await getBookingById(currentBookingId); // Tambahkan await
       if (!booking) return;
 
-      // Update current booking data
       setCurrentBooking(booking);
 
-      // Pastikan payment code tidak berubah
       if (booking.paymentCode && booking.paymentCode !== paymentCode) {
         setPaymentCode(booking.paymentCode);
       }
 
-      // Pastikan status approved langsung ke step 5 (Chat)
       if (booking.approvalStatus === "approved" && bookingStatus !== "approved") {
         setBookingStatus("approved");
-        setStep(5); // Langsung ke step 5 (Chat)
+        setStep(5);
         toast({
           title: "Pemesanan Disetujui!",
           description: "Admin menyetujui pemesanan. Anda sekarang dapat mengobrol dengan talent.",
@@ -391,10 +390,8 @@ export default function Booking() {
     };
   }, [currentBookingId, bookingStatus, paymentCode, toast]);
 
-  // Tambahkan state untuk QRIS amount dengan 3 digit terakhir random
   const [qrisAmount, setQrisAmount] = useState<number>(0);
 
-  // Update QRIS amount ketika displayTalent atau bookingData.duration berubah
   useEffect(() => {
     if (displayTalent && displayTalent.pricePerHour) {
       const totalPrice = displayTalent.pricePerHour * bookingData.duration;
@@ -402,7 +399,6 @@ export default function Booking() {
     }
   }, [displayTalent, bookingData.duration]);
 
-  // 🔥 PERBAIKAN UTAMA: Ganti bagian yang menyebabkan white screen dengan loading state
   if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-gradient-warm pt-16 md:pt-24 pb-8 flex items-center justify-center">
@@ -414,13 +410,11 @@ export default function Booking() {
     );
   }
 
-  // 🔥 PERBAIKAN: Jika tidak ada ID, redirect ke halaman talents tanpa menampilkan pesan error
   if (!id) {
     navigate("/talents");
     return null;
   }
 
-  // Gunakan data dari currentBooking jika displayTalent tidak tersedia
   const talentForDisplay = displayTalent || (currentBooking ? {
     id: currentBooking.talentId,
     name: currentBooking.talentName,
@@ -431,7 +425,6 @@ export default function Booking() {
     rating: "0"
   } : null);
 
-  // 🔥 PERBAIKAN: Jika talent tidak ditemukan, redirect ke halaman talents tanpa menampilkan pesan error
   if (!talentForDisplay) {
     navigate("/talents");
     return null;
@@ -445,7 +438,6 @@ export default function Booking() {
     }).format(price);
   };
 
-  // Gunakan talentForDisplay untuk perhitungan harga
   const totalPrice = talentForDisplay ? talentForDisplay.pricePerHour * bookingData.duration : 0;
   const displayAmount = talentForDisplay ? getRandomizedAmount(totalPrice) : 0;
 
@@ -462,8 +454,7 @@ export default function Booking() {
     setStep(step - 1);
   };
 
-  // Hapus duplikat fungsi handlePayment dan gunakan hanya satu fungsi yang sudah diperbaiki
-  const handlePayment = () => {
+  const handlePayment = async () => {
     const currentUser = getCurrentUserOrMitra();
     
     if (!currentUser) {
@@ -477,7 +468,6 @@ export default function Booking() {
 
     const newPaymentCode = getOrCreateStablePaymentCode();
 
-    // Tentukan data pemesan berdasarkan jenis user
     const bookerData = currentUser.type === "mitra" 
       ? {
           userName: currentUser.data.name,
@@ -492,7 +482,7 @@ export default function Booking() {
           bookerId: currentUser.data.id,
         };
 
-    const booking = addBooking({
+    const booking = await addBooking({ 
       ...bookerData,
       talentId: talentForDisplay.id,
       talentName: talentForDisplay.name,
@@ -548,61 +538,48 @@ export default function Booking() {
 
       let booking: SharedBooking;
 
-      if (currentBookingId) {
-        const updated = updateBookingPayment(currentBookingId, {
-          paymentMethod,
-          paymentCode, // Gunakan payment code yang sudah ada dan stabil
-          paymentProof,
-          transferAmount: autoTransferAmount,
-          transferTime: autoTransferTime,
-        });
+      // KODE YANG SUDAH DIPERBAIKI
+if (currentBookingId) {
+  // Jika booking sudah ada, update pembayarannya
+  const updated = await updateBookingPayment(currentBookingId, {
+    paymentMethod,
+    paymentCode,
+    paymentProof,
+    transferAmount: autoTransferAmount,
+    transferTime: autoTransferTime,
+  });
 
-        if (!updated) {
-          throw new Error("Booking tidak ditemukan");
-        }
+  if (!updated) {
+    throw new Error("Booking tidak ditemukan");
+  }
 
-        booking = updated;
-      } else {
-        await createBooking({
-          user_id: currentUser.data.id,
-          talent_id: talentForDisplay.id,
-          purpose: bookingData.purpose,
-          type: bookingData.type,
-          date: bookingData.date,
-          time: bookingData.time,
-          duration: bookingData.duration,
-          total: totalPrice,
-          payment_status: "paid",
-          approval_status: "pending_approval",
-          payment_method: paymentMethod,
-          payment_code: paymentCode,
-          payment_proof: paymentProof,
-          transfer_amount: autoTransferAmount,
-          transfer_time: autoTransferTime,
-        });
-
-        booking = addBooking({
-          userName: currentUser.data.name,
-          userPhoto: currentUser.data.photo,
-          talentId: talentForDisplay.id,
-          talentName: talentForDisplay.name,
-          talentPhoto: talentForDisplay.photo,
-          purpose: bookingData.purpose,
-          type: bookingData.type,
-          date: bookingData.date,
-          time: bookingData.time,
-          duration: bookingData.duration,
-          total: totalPrice,
-          notes: bookingData.notes,
-          paymentStatus: "paid",
-          approvalStatus: "pending_approval",
-          paymentMethod,
-          paymentCode,
-          paymentProof,
-          transferAmount: autoTransferAmount,
-          transferTime: autoTransferTime,
-        });
-      }
+  booking = updated;
+} else {
+  // Jika ini booking baru, gunakan SATU fungsi addBooking yang sudah benar
+  booking = await addBooking({
+    userName: currentUser.data.name,
+    userPhoto: currentUser.data.photo,
+    bookerType: currentUser.type === "mitra" ? "mitra" : "user",
+    bookerId: currentUser.data.id,
+    talentId: talentForDisplay.id,
+    talentName: talentForDisplay.name,
+    talentPhoto: talentForDisplay.photo,
+    purpose: bookingData.purpose,
+    type: bookingData.type,
+    date: bookingData.date,
+    time: bookingData.time,
+    duration: bookingData.duration,
+    total: totalPrice,
+    notes: bookingData.notes,
+    paymentStatus: "paid",
+    approvalStatus: "pending_approval",
+    paymentMethod,
+    paymentCode,
+    paymentProof,
+    transferAmount: autoTransferAmount,
+    transferTime: autoTransferTime,
+  });
+}
 
       setCurrentBookingId(booking.id);
       setBookingStatus("pending_approval");
@@ -636,12 +613,9 @@ export default function Booking() {
   const isStepValid = () => {
     switch (step) {
       case 1:
-        // Validasi tujuan pemesanan
         if (bookingData.purpose.startsWith("Lainnya:")) {
-          // Jika "Lainnya" dipilih, pastikan ada teks kustom
           return bookingData.duration > 0 && customPurpose.trim().length > 0;
         } else {
-          // Jika opsi lain dipilih, pastikan tujuan tidak kosong
           return bookingData.duration > 0 && bookingData.purpose.trim().length > 0;
         }
       case 2:
@@ -685,7 +659,7 @@ export default function Booking() {
           {getStatusBadge()}
         </div>
 
-        {/* Progress Steps - HANYA 5 STEP */}
+        {/* Progress Steps */}
         <div className="flex items-center justify-center mb-8 overflow-x-auto pb-2">
           {[
             { num: 1, label: "Detail" },
@@ -760,33 +734,23 @@ export default function Booking() {
               {step === 1 && bookingStatus === "draft" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Detail Pemesanan</h2>
-
-                  {/* Duration */}
                   <div>
-                    <label className="text-sm font-medium mb-3 block">
-                      Durasi (jam)
-                    </label>
+                    <label className="text-sm font-medium mb-3 block">Durasi (jam)</label>
                     <div className="flex gap-2">
                       {[1, 2, 3, 4, 5, 6].map((h) => (
                         <Button
                           key={h}
                           variant={bookingData.duration === h ? "default" : "outline"}
                           size="sm"
-                          onClick={() =>
-                            setBookingData({ ...bookingData, duration: h })
-                          }
+                          onClick={() => setBookingData({ ...bookingData, duration: h })}
                         >
                           {h} jam
                         </Button>
                       ))}
                     </div>
                   </div>
-
-                  {/* Purpose */}
                   <div>
-                    <label className="text-sm font-medium mb-3 block">
-                      Tujuan Pemesanan
-                    </label>
+                    <label className="text-sm font-medium mb-3 block">Tujuan Pemesanan</label>
                     <div className="grid grid-cols-2 gap-2">
                       {bookingPurposes.map((purpose) => (
                         <Button
@@ -803,7 +767,7 @@ export default function Booking() {
                               setBookingData({ ...bookingData, purpose: "Lainnya:" });
                             } else {
                               setBookingData({ ...bookingData, purpose });
-                              setCustomPurpose(""); // Reset custom purpose when selecting predefined option
+                              setCustomPurpose("");
                             }
                           }}
                         >
@@ -811,8 +775,6 @@ export default function Booking() {
                         </Button>
                       ))}
                     </div>
-                    
-                    {/* Tampilkan input teks jika "Lainnya" dipilih */}
                     {bookingData.purpose.startsWith("Lainnya:") && (
                       <div className="mt-3">
                         <Input
@@ -829,46 +791,32 @@ export default function Booking() {
                       </div>
                     )}
                   </div>
-
-                  {/* Type */}
                   <div>
-                    <label className="text-sm font-medium mb-3 block">
-                      Tipe Pertemuan
-                    </label>
+                    <label className="text-sm font-medium mb-3 block">Tipe Pertemuan</label>
                     <div className="grid grid-cols-2 gap-4">
                       <Card
                         hover
                         className={cn(
                           "p-4 text-center cursor-pointer",
-                          bookingData.type === "offline" &&
-                            "border-primary ring-2 ring-primary/20"
+                          bookingData.type === "offline" && "border-primary ring-2 ring-primary/20"
                         )}
-                        onClick={() =>
-                          setBookingData({ ...bookingData, type: "offline" })
-                        }
+                        onClick={() => setBookingData({ ...bookingData, type: "offline" })}
                       >
                         <Users className="w-8 h-8 mx-auto mb-2 text-primary" />
                         <h4 className="font-semibold">Offline</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Bertemu langsung
-                        </p>
+                        <p className="text-xs text-muted-foreground">Bertemu langsung</p>
                       </Card>
                       <Card
                         hover
                         className={cn(
                           "p-4 text-center cursor-pointer",
-                          bookingData.type === "online" &&
-                            "border-primary ring-2 ring-primary/20"
+                          bookingData.type === "online" && "border-primary ring-2 ring-primary/20"
                         )}
-                        onClick={() =>
-                          setBookingData({ ...bookingData, type: "online" })
-                        }
+                        onClick={() => setBookingData({ ...bookingData, type: "online" })}
                       >
                         <Video className="w-8 h-8 mx-auto mb-2 text-primary" />
                         <h4 className="font-semibold">Online</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Video call
-                        </p>
+                        <p className="text-xs text-muted-foreground">Video call</p>
                       </Card>
                     </div>
                   </div>
@@ -878,14 +826,9 @@ export default function Booking() {
               {step === 2 && bookingStatus === "draft" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Jadwal & Waktu</h2>
-
-                  {/* DATE + TIME SIDE BY SIDE */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* TANGGAL */}
                     <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Tanggal
-                      </label>
+                      <label className="text-sm font-medium mb-2 block">Tanggal</label>
                       <div className="relative">
                         <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
@@ -896,37 +839,30 @@ export default function Booking() {
                             setBookingData({
                               ...bookingData,
                               date: e.target.value,
-                              time: "", // reset waktu saat tanggal berubah
+                              time: "",
                             });
                           }}
                           min={new Date().toISOString().split("T")[0]}
                         />
                       </div>
                     </div>
-
-                    {/* WAKTU */}
                     <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Waktu Mulai
-                      </label>
-
+                      <label className="text-sm font-medium mb-2 block">Waktu Mulai</label>
                       {!bookingData.date ? (
                         <div className="h-10 rounded-xl border-2 border-dashed flex items-center justify-center text-xs text-muted-foreground">
                           Pilih tanggal terlebih dahulu
                         </div>
+                      ) : isLoadingBookedSlots ? (
+                        <div className="h-48 rounded-xl border-2 border-dashed flex items-center justify-center text-xs text-muted-foreground">
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Memeriksa ketersediaan jam...
+                        </div>
                       ) : (
                         <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-2 border rounded-xl">
-                          {generateTimeSlots().map((time) => {
-                            const isBooked = isTimeSlotBooked(
-                              id!,
-                              bookingData.date,
-                              time,
-                              bookingData.duration
-                            );
-
+                          {timeSlots.map((time) => {
+                            const isBooked = isTimeSlotBookedClientSide(time);
                             const [hour] = time.split(":").map(Number);
                             const isOutsideWorkingHours = hour < 8 || hour >= 22;
-
                             return (
                               <Button
                                 key={time}
@@ -938,9 +874,7 @@ export default function Booking() {
                                     "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
                                 )}
                                 disabled={isBooked || isOutsideWorkingHours}
-                                onClick={() =>
-                                  setBookingData({ ...bookingData, time })
-                                }
+                                onClick={() => setBookingData({ ...bookingData, time })}
                               >
                                 {time}
                               </Button>
@@ -950,23 +884,16 @@ export default function Booking() {
                       )}
                     </div>
                   </div>
-
                   <p className="text-xs text-muted-foreground">
                     Jam yang dinonaktifkan sudah dipesan atau di luar jam operasional (08.00–22.00).
                   </p>
-
-                  {/* CATATAN */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Catatan Tambahan (opsional)
-                    </label>
+                    <label className="text-sm font-medium mb-2 block">Catatan Tambahan (opsional)</label>
                     <textarea
                       className="w-full h-24 rounded-xl border-2 border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-none"
                       placeholder="Tuliskan catatan atau permintaan khusus..."
                       value={bookingData.notes}
-                      onChange={(e) =>
-                        setBookingData({ ...bookingData, notes: e.target.value })
-                      }
+                      onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
                     />
                   </div>
                 </div>
@@ -975,57 +902,17 @@ export default function Booking() {
               {step === 3 && bookingStatus === "draft" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Konfirmasi & Pembayaran</h2>
-
                   <div className="space-y-4">
-                    <div className="flex justify-between py-3 border-b">
-                      <span className="text-muted-foreground">Durasi</span>
-                      <span className="font-medium">{bookingData.duration} jam</span>
-                    </div>
-                    <div className="flex justify-between py-3 border-b">
-                      <span className="text-muted-foreground">Tujuan</span>
-                      <span className="font-medium">
-                        {bookingData.purpose.startsWith("Lainnya:") 
-                          ? customPurpose || bookingData.purpose 
-                          : bookingData.purpose}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-3 border-b">
-                      <span className="text-muted-foreground">Tipe</span>
-                      <Badge variant={bookingData.type === "online" ? "accent" : "secondary"}>
-                        {bookingData.type === "online" ? "Online" : "Offline"}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between py-3 border-b">
-                      <span className="text-muted-foreground">Tanggal & Waktu</span>
-                      <span className="font-medium">
-                        {bookingData.date && new Date(bookingData.date).toLocaleDateString("id-ID", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                        })}{" "}
-                        - {bookingData.time}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-3 border-b">
-                      <span className="text-muted-foreground">Harga per jam</span>
-                      <span className="font-medium">
-                        {formatPrice(talentForDisplay.pricePerHour)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-3 text-lg font-bold">
-                      <span>Total</span>
-                      <span className="text-primary">{formatPrice(totalPrice)}</span>
-                    </div>
+                    <div className="flex justify-between py-3 border-b"><span className="text-muted-foreground">Durasi</span><span className="font-medium">{bookingData.duration} jam</span></div>
+                    <div className="flex justify-between py-3 border-b"><span className="text-muted-foreground">Tujuan</span><span className="font-medium">{bookingData.purpose.startsWith("Lainnya:") ? customPurpose || bookingData.purpose : bookingData.purpose}</span></div>
+                    <div className="flex justify-between py-3 border-b"><span className="text-muted-foreground">Tipe</span><Badge variant={bookingData.type === "online" ? "accent" : "secondary"}>{bookingData.type === "online" ? "Online" : "Offline"}</Badge></div>
+                    <div className="flex justify-between py-3 border-b"><span className="text-muted-foreground">Tanggal & Waktu</span><span className="font-medium">{bookingData.date && new Date(bookingData.date).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", })} - {bookingData.time}</span></div>
+                    <div className="flex justify-between py-3 border-b"><span className="text-muted-foreground">Harga per jam</span><span className="font-medium">{formatPrice(talentForDisplay.pricePerHour)}</span></div>
+                    <div className="flex justify-between py-3 text-lg font-bold"><span>Total</span><span className="text-primary">{formatPrice(totalPrice)}</span></div>
                   </div>
-
                   <Card className="p-4 bg-accent/50 flex items-center gap-3">
                     <CreditCard className="w-6 h-6 text-primary" />
-                    <div>
-                      <p className="font-medium">Metode Pembayaran</p>
-                      <p className="text-sm text-muted-foreground">
-                        Transfer Bank / E-Wallet
-                      </p>
-                    </div>
+                    <div><p className="font-medium">Metode Pembayaran</p><p className="text-sm text-muted-foreground">Transfer Bank / E-Wallet</p></div>
                   </Card>
                 </div>
               )}
@@ -1033,266 +920,70 @@ export default function Booking() {
               {bookingStatus === "pending_payment" && (
                 <div className="space-y-6 animate-fade-in">
                   <h2 className="text-xl font-bold">Metode Pembayaran</h2>
-
-                  {/* Payment Summary */}
                   <Card className="p-4 bg-muted/50">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Pembayaran</span>
-                      <span className="text-2xl font-bold text-primary">{formatPrice(totalPrice)}</span>
-                    </div>
-                    {paymentCode && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Kode Konfirmasi</span>
-                          <span className="text-sm font-mono font-semibold">{paymentCode}</span>
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center"><span className="text-muted-foreground">Total Pembayaran</span><span className="text-2xl font-bold text-primary">{formatPrice(totalPrice)}</span></div>
+                    {paymentCode && (<div className="mt-3 pt-3 border-t"><div className="flex justify-between items-center"><span className="text-sm text-muted-foreground">Kode Konfirmasi</span><span className="text-sm font-mono font-semibold">{paymentCode}</span></div></div>)}
                   </Card>
-
-                  {/* Payment Method Selection */}
                   <div>
-                    <label className="text-sm font-medium mb-3 block">
-                      Pilih Metode Pembayaran
-                    </label>
+                    <label className="text-sm font-medium mb-3 block">Pilih Metode Pembayaran</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <Card
-                        hover
-                        className={cn(
-                          "p-4 text-center cursor-pointer border-2 transition-all",
-                          paymentMethod === "qris"
-                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
-                            : "border-input hover:border-primary/50"
-                        )}
-                        onClick={() => setPaymentMethod("qris")}
-                      >
-                        <QrCode className="w-8 h-8 mx-auto mb-2 text-primary" />
-                        <h4 className="font-semibold text-sm">QRIS</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Scan QR Code
-                        </p>
-                      </Card>
-
-                      <Card
-                        hover
-                        className={cn(
-                          "p-4 text-center cursor-pointer border-2 transition-all",
-                          paymentMethod === "bca"
-                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
-                            : "border-input hover:border-primary/50"
-                        )}
-                        onClick={() => setPaymentMethod("bca")}
-                      >
-                        <Building2 className="w-8 h-8 mx-auto mb-2 text-primary" />
-                        <h4 className="font-semibold text-sm">Bank BCA</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Transfer Bank
-                        </p>
-                      </Card>
-
-                      <Card
-                        hover
-                        className={cn(
-                          "p-4 text-center cursor-pointer border-2 transition-all",
-                          paymentMethod === "bri"
-                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
-                            : "border-input hover:border-primary/50"
-                        )}
-                        onClick={() => setPaymentMethod("bri")}
-                      >
-                        <Building2 className="w-8 h-8 mx-auto mb-2 text-primary" />
-                        <h4 className="font-semibold text-sm">Bank BRI</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Transfer Bank
-                        </p>
-                      </Card>
-
-                      <Card
-                        hover
-                        className={cn(
-                          "p-4 text-center cursor-pointer border-2 transition-all",
-                          paymentMethod === "mandiri"
-                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
-                            : "border-input hover:border-primary/50"
-                        )}
-                        onClick={() => setPaymentMethod("mandiri")}
-                      >
-                        <Building2 className="w-8 h-8 mx-auto mb-2 text-primary" />
-                        <h4 className="font-semibold text-sm">Bank Mandiri</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Transfer Bank
-                        </p>
-                      </Card>
+                      {["qris", "bca", "bri", "mandiri"].map((method) => (
+                        <Card
+                          key={method}
+                          hover
+                          className={cn("p-4 text-center cursor-pointer border-2 transition-all", paymentMethod === method ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-input hover:border-primary/50")}
+                          onClick={() => setPaymentMethod(method as any)}
+                        >
+                          {method === "qris" ? <QrCode className="w-8 h-8 mx-auto mb-2 text-primary" /> : <Building2 className="w-8 h-8 mx-auto mb-2 text-primary" />}
+                          <h4 className="font-semibold text-sm">{method.toUpperCase()}</h4>
+                          <p className="text-xs text-muted-foreground mt-1">{method === "qris" ? "Scan QR Code" : "Transfer Bank"}</p>
+                        </Card>
+                      ))}
                     </div>
                   </div>
-
-                  {/* QRIS Payment Details */}
                   {paymentMethod === "qris" && (
                     <Card className="p-6 bg-accent/50">
                       <h3 className="font-semibold mb-4 text-center">Scan QR Code untuk Pembayaran</h3>
-                      
-                      {qrisCode ? (
-                        <div className="flex justify-center mb-4">
-                          <img
-                            src={qrisCode}
-                            alt="QRIS Payment"
-                            className="w-64 h-64 rounded-lg border"
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-center text-sm text-red-500">
-                          QRIS Code belum diset oleh admin.
-                        </div>
-                      )}
-
-                      <div className="bg-background rounded-lg p-4 mb-4 border">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">Total Pembayaran</span>
-                          <span className="text-xl font-bold text-primary">{formatPrice(qrisAmount)}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-center space-y-2">
-                        <p className="text-sm font-medium">Kode Konfirmasi Pembayaran</p>
-                        <p className="text-lg font-mono font-bold text-primary">{paymentCode}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Gunakan kode ini untuk pembayaran.
-                        </p>
-                      </div>
+                      {qrisCode ? (<div className="flex justify-center mb-4"><img src={qrisCode} alt="QRIS Payment" className="w-90 h-90 md:w-100 md:h-100 rounded-lg border max-w-sm md:max-w-md" /></div>) : (<div className="text-center text-sm text-red-500">QRIS Code belum diset oleh admin.</div>)}
+                      <div className="bg-background rounded-lg p-4 mb-4 border"><div className="flex justify-between items-center"><span className="text-sm font-medium">Total Pembayaran</span><span className="text-xl font-bold text-primary">{formatPrice(qrisAmount)}</span></div></div>
+                      <div className="text-center space-y-2"><p className="text-sm font-medium">Kode Konfirmasi Pembayaran</p><p className="text-lg font-mono font-bold text-primary">{paymentCode}</p><p className="text-xs text-muted-foreground">Gunakan kode ini untuk pembayaran.</p></div>
                     </Card>
                   )}
                   {(paymentMethod === "bca" || paymentMethod === "bri" || paymentMethod === "mandiri") && (
                     <Card className="p-6 bg-accent/50">
                       <h3 className="font-semibold mb-4 text-center">Informasi Rekening</h3>
-                      
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-muted-foreground">Nama Bank</span>
-                          <span className="font-semibold">
-                            {paymentMethod === "bca" && "Bank BCA"}
-                            {paymentMethod === "bri" && "Bank BRI"}
-                            {paymentMethod === "mandiri" && "Bank Mandiri"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-muted-foreground">Nomor Rekening</span>
-                          <span className="font-mono font-semibold">
-                            {paymentMethod === "bca" && maskBankAccount(bankAccounts.bca.number)}
-                            {paymentMethod === "bri" && maskBankAccount(bankAccounts.bri.number)}
-                            {paymentMethod === "mandiri" && maskBankAccount(bankAccounts.mandiri.number)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-muted-foreground">Nama Penerima</span>
-                          <span className="font-semibold">
-                            {paymentMethod === "bca" && bankAccounts.bca.holder}
-                            {paymentMethod === "bri" && bankAccounts.bri.holder}
-                            {paymentMethod === "mandiri" && bankAccounts.mandiri.holder}
-                          </span>
-                        </div>
-                        <div className="pt-4 border-t">
-                          <p className="text-sm font-medium mb-2">Nominal Transfer</p>
-                          <p className="text-lg font-bold text-primary text-center">{formatPrice(displayAmount)}</p>
-                          <p className="text-xs text-muted-foreground text-center mt-1">
-                            Nominal ini akan tercatat otomatis saat Anda konfirmasi pembayaran
-                          </p>
-                        </div>
-                        <div className="pt-4 border-t">
-                          <p className="text-sm font-medium mb-2">Kode Konfirmasi Pembayaran</p>
-                          <p className="text-lg font-mono font-bold text-primary text-center">{paymentCode}</p>
-                          <p className="text-xs text-muted-foreground text-center mt-2">
-                            Cantumkan kode ini saat transfer.
-                          </p>
-                        </div>
+                        <div className="flex justify-between items-center py-2 border-b"><span className="text-muted-foreground">Nama Bank</span><span className="font-semibold">{`Bank ${paymentMethod.toUpperCase()}`}</span></div>
+                        <div className="flex justify-between items-center py-2 border-b"><span className="text-muted-foreground">Nomor Rekening</span><span className="font-mono font-semibold">{maskBankAccount(bankAccounts[paymentMethod as keyof typeof bankAccounts].number)}</span></div>
+                        <div className="flex justify-between items-center py-2 border-b"><span className="text-muted-foreground">Nama Penerima</span><span className="font-semibold">{bankAccounts[paymentMethod as keyof typeof bankAccounts].holder}</span></div>
+                        <div className="pt-4 border-t"><p className="text-sm font-medium mb-2">Nominal Transfer</p><p className="text-lg font-bold text-primary text-center">{formatPrice(displayAmount)}</p><p className="text-xs text-muted-foreground text-center mt-1">Nominal ini akan tercatat otomatis saat Anda konfirmasi pembayaran</p></div>
+                        <div className="pt-4 border-t"><p className="text-sm font-medium mb-2">Kode Konfirmasi Pembayaran</p><p className="text-lg font-mono font-bold text-primary text-center">{paymentCode}</p><p className="text-xs text-muted-foreground text-center mt-2">Cantumkan kode ini saat transfer.</p></div>
                       </div>
                     </Card>
                   )}
-
                   {paymentMethod && (
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium mb-2 block">
-                          Upload Bukti Pembayaran 
-                          {(paymentMethod === "bca" || paymentMethod === "bri" || paymentMethod === "mandiri" || paymentMethod === "qris") && (
-                            <span className="text-red-500">*</span>
-                          )}
-                        </label>
+                        <label className="text-sm font-medium mb-2 block">Upload Bukti Pembayaran <span className="text-red-500">*</span></label>
                         <div className="border-2 border-dashed border-input rounded-lg p-6 text-center">
-                          <input
-                            type="file"
-                            id="payment-proof"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-
-                              setPaymentProofFile(file);
-
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setPaymentProof(reader.result as string);
-                              };
-                              reader.readAsDataURL(file);
-                            }}
-                          />
-                          <label
-                            htmlFor="payment-proof"
-                            className="cursor-pointer flex flex-col items-center gap-2"
-                          >
+                          <input type="file" id="payment-proof" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setPaymentProofFile(file); const reader = new FileReader(); reader.onloadend = () => { setPaymentProof(reader.result as string); }; reader.readAsDataURL(file); }} />
+                          <label htmlFor="payment-proof" className="cursor-pointer flex flex-col items-center gap-2">
                             <Upload className="w-8 h-8 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">
-                              {paymentProofFile ? paymentProofFile.name : "Klik untuk upload gambar"}
-                            </span>
+                            <span className="text-sm text-muted-foreground">{paymentProofFile ? paymentProofFile.name : "Klik untuk upload gambar"}</span>
                           </label>
                         </div>
                       </div>
-
                       <div>
-                        <label className="text-sm font-medium mb-2 block">
-                          Pesan untuk Admin (Opsional)
-                        </label>
-                        <textarea
-                          className="w-full h-24 rounded-xl border-2 border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary resize-none"
-                          placeholder="Tuliskan catatan tambahan untuk admin..."
-                          value={paymentNote}
-                          onChange={(e) => setPaymentNote(e.target.value)}
-                        />
+                        <label className="text-sm font-medium mb-2 block">Pesan untuk Admin (Opsional)</label>
+                        <textarea className="w-full h-24 rounded-xl border-2 border-input bg-background px-4 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary resize-none" placeholder="Tuliskan catatan tambahan untuk admin..." value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} />
                       </div>
                     </div>
                   )}
-
                   {paymentMethod && (
                     <div className="flex gap-3 pt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setBookingStatus("draft");
-                          setPaymentMethod(null);
-                          setTransferAmount(0);
-                          setTransferTime("");
-                          setPaymentProof("");
-                        }}
-                        className="flex-1"
-                      >
-                        Batal
-                      </Button>
-                      <Button
-                          variant="hero"
-                          onClick={handleConfirmPayment}
-                          disabled={isProcessing || 
-                            ((paymentMethod === "bca" || paymentMethod === "bri" || paymentMethod === "mandiri" || paymentMethod === "qris") && !paymentProof)
-                          }
-                          className="flex-1"
-                        >
-                        {isProcessing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Memproses...
-                          </>
-                        ) : (
-                          "Saya Sudah Transfer"
-                        )}
+                      <Button variant="outline" onClick={() => { setBookingStatus("draft"); setPaymentMethod(null); setTransferAmount(0); setTransferTime(""); setPaymentProof(""); }} className="flex-1">Batal</Button>
+                      <Button variant="hero" onClick={handleConfirmPayment} disabled={isProcessing || !paymentProof} className="flex-1">
+                        {isProcessing ? (<> <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Memproses... </>) : ("Saya Sudah Transfer")}
                       </Button>
                     </div>
                   )}
@@ -1301,80 +992,23 @@ export default function Booking() {
 
               {(bookingStatus === "pending_approval" || bookingStatus === "rejected") && (
                 <div className="py-8 text-center animate-fade-in">
-                  <div className={cn(
-                    "w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4",
-                    bookingStatus === "rejected" 
-                      ? "bg-red-100 dark:bg-red-900/30" 
-                      : "bg-accent"
-                  )}>
-                    {bookingStatus === "rejected" ? (
-                      <ShieldCheck className="w-10 h-10 text-red-500" />
-                    ) : (
-                      <ShieldCheck className="w-10 h-10 text-primary" />
-                    )}
+                  <div className={cn("w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4", bookingStatus === "rejected" ? "bg-red-100 dark:bg-red-900/30" : "bg-accent")}>
+                    {bookingStatus === "rejected" ? (<ShieldCheck className="w-10 h-10 text-red-500" />) : (<ShieldCheck className="w-10 h-10 text-primary" />)}
                   </div>
-                  <h2 className="text-xl font-bold mb-2">
-                    {bookingStatus === "rejected" ? "Pemesanan Ditolak" : "Menunggu Persetujuan Admin"}
-                  </h2>
-                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                    {bookingStatus === "rejected" 
-                      ? "Maaf, admin menolak pemesanan Anda. Silakan hubungi admin untuk informasi lebih lanjut."
-                      : "⏳ Menunggu verifikasi pembayaran oleh admin"}
-                  </p>
-                  
+                  <h2 className="text-xl font-bold mb-2">{bookingStatus === "rejected" ? "Pemesanan Ditolak" : "Menunggu Persetujuan Admin"}</h2>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">{bookingStatus === "rejected" ? "Maaf, admin menolak pemesanan Anda. Silakan hubungi admin untuk informasi lebih lanjut." : "⏳ Menunggu verifikasi pembayaran oleh admin"}</p>
                   <Card className="p-4 bg-muted/50 max-w-sm mx-auto mb-6">
                     <div className="flex items-center gap-3 text-left">
-                      <img
-                        src={talentForDisplay.photo}
-                        alt={talentForDisplay.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
+                      <img src={talentForDisplay.photo} alt={talentForDisplay.name} className="w-12 h-12 rounded-full object-cover" />
                       <div>
                         <p className="font-semibold">{talentForDisplay.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {bookingData.purpose.startsWith("Lainnya:") 
-                            ? customPurpose || bookingData.purpose 
-                            : bookingData.purpose}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{bookingData.purpose.startsWith("Lainnya:") ? customPurpose || bookingData.purpose : bookingData.purpose}</p>
                       </div>
                     </div>
                   </Card>
-
-                  {bookingStatus === "pending_approval" && (
-                    <div className="border-t pt-6">
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-4">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Menunggu admin menyetujui pemesanan...</span>
-                      </div>
-                      <p className="text-xs text-center text-muted-foreground mt-3">
-                        Kamu akan menerima notifikasi setelah pemesanan disetujui
-                      </p>
-                    </div>
-                  )}
-                  
-                  {bookingStatus === "rejected" && (
-                    <div className="border-t pt-6">
-                      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
-                        <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
-                          Informasi Refund
-                        </p>
-                        <p className="text-xs text-red-600 dark:text-red-400">
-                          Jika pembayaran sudah dilakukan, dana akan dikembalikan dalam 1-3 hari kerja. 
-                          Silakan hubungi admin untuk informasi lebih lanjut.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-3 mt-6">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => navigate('/bookings')}
-                      className="flex-1"
-                    >
-                      Lihat Pemesanan Saya
-                    </Button>
-                  </div>
+                  {bookingStatus === "pending_approval" && (<div className="border-t pt-6"><div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-4"><Loader2 className="w-4 h-4 animate-spin" /><span>Menunggu admin menyetujui pemesanan...</span></div><p className="text-xs text-center text-muted-foreground mt-3">Kamu akan menerima notifikasi setelah pemesanan disetujui</p></div>)}
+                  {bookingStatus === "rejected" && (<div className="border-t pt-6"><div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4"><p className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">Informasi Refund</p><p className="text-xs text-red-600 dark:text-red-400">Jika pembayaran sudah dilakukan, dana akan dikembalikan dalam 1-3 hari kerja. Silakan hubungi admin untuk informasi lebih lanjut.</p></div></div>)}
+                  <div className="flex gap-3 mt-6"><Button variant="outline" onClick={() => navigate('/bookings')} className="flex-1">Lihat Pemesanan Saya</Button></div>
                 </div>
               )}
 
@@ -1384,58 +1018,18 @@ export default function Booking() {
                     <CheckCircle2 className="w-10 h-10 text-green-500" />
                   </div>
                   <h2 className="text-xl font-bold mb-2">Pemesanan Disetujui!</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Percakapan dengan {talentForDisplay.name} sudah aktif
-                  </p>
-                  
+                  <p className="text-muted-foreground mb-6">Percakapan dengan {talentForDisplay.name} sudah aktif</p>
                   <Link to={`/chat/${currentBookingId}`}>
-                    <Button variant="hero" size="lg" className="gap-2">
-                      <MessageCircle className="w-5 h-5" />
-                      Buka Percakapan
-                    </Button>
+                    <Button variant="hero" size="lg" className="gap-2"><MessageCircle className="w-5 h-5" /> Buka Percakapan</Button>
                   </Link>
-                  
-                  <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      ✅ Langkah 5: Percakapan Aktif - Kamu bisa mulai ngobrol sekarang!
-                    </p>
-                  </div>
+                  <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl"><p className="text-sm text-green-700 dark:text-green-300">✅ Langkah 5: Percakapan Aktif - Kamu bisa mulai ngobrol sekarang!</p></div>
                 </div>
               )}
 
               {bookingStatus === "draft" && (
                 <div className="flex gap-3 mt-8">
-                  {step > 1 && (
-                    <Button variant="outline" onClick={handleBack} className="flex-1">
-                      Kembali
-                    </Button>
-                  )}
-                  {step < 3 ? (
-                    <Button
-                      variant="hero"
-                      onClick={handleNext}
-                      disabled={!isStepValid()}
-                      className="flex-1"
-                    >
-                      Lanjutkan
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="hero"
-                      onClick={handlePayment}
-                      disabled={isProcessing}
-                      className="flex-1"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Memproses...
-                        </>
-                      ) : (
-                        "Bayar Sekarang"
-                      )}
-                    </Button>
-                  )}
+                  {step > 1 && (<Button variant="outline" onClick={handleBack} className="flex-1">Kembali</Button>)}
+                  {step < 3 ? (<Button variant="hero" onClick={handleNext} disabled={!isStepValid()} className="flex-1">Lanjutkan</Button>) : (<Button variant="hero" onClick={handlePayment} disabled={isProcessing} className="flex-1">{isProcessing ? (<> <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Memproses... </>) : ("Bayar Sekarang")}</Button>)}
                 </div>
               )}
             </Card>
@@ -1445,61 +1039,26 @@ export default function Booking() {
           <div className="hidden md:block">
             <Card className="p-5 sticky top-24">
               <div className="flex gap-4 mb-4">
-                <img
-                  src={talentForDisplay.photo}
-                  alt={talentForDisplay.name}
-                  className="w-20 h-20 rounded-xl object-cover"
-                />
+                <img src={talentForDisplay.photo} alt={talentForDisplay.name} className="w-20 h-20 rounded-xl object-cover" />
                 <div>
                   <h3 className="font-bold">{talentForDisplay.name}</h3>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="w-3 h-3" />
-                    {talentForDisplay.city}
-                  </div>
-                  <div className="flex gap-1 mt-2">
-                    {talentForDisplay.skills?.slice(0, 2).map((skill: string) => (
-                      <Badge key={skill} variant="secondary" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="w-3 h-3" />{talentForDisplay.city}</div>
+                  <div className="flex gap-1 mt-2">{talentForDisplay.skills?.slice(0, 2).map((skill: string) => (<Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>))}</div>
                 </div>
               </div>
-
               <div className="border-t pt-4 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Harga per jam</span>
-                  <span className="font-medium">
-                    {formatPrice(talentForDisplay.pricePerHour)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Durasi</span>
-                  <span className="font-medium">{bookingData.duration} jam</span>
-                </div>
-                <div className="flex justify-between font-bold pt-3 border-t">
-                  <span>Total</span>
-                  <span className="text-primary">{formatPrice(totalPrice)}</span>
-                </div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Harga per jam</span><span className="font-medium">{formatPrice(talentForDisplay.pricePerHour)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Durasi</span><span className="font-medium">{bookingData.duration} jam</span></div>
+                <div className="flex justify-between font-bold pt-3 border-t"><span>Total</span><span className="text-primary">{formatPrice(totalPrice)}</span></div>
               </div>
-
               <div className="mt-4 pt-4 border-t">
                 <p className="text-xs font-medium mb-2">Alur Pemesanan:</p>
                 <ol className="text-xs text-muted-foreground space-y-1">
                   <li className={cn(step >= 1 && "text-primary font-medium")}>1. Pilih detail</li>
                   <li className={cn(step >= 2 && "text-primary font-medium")}>2. Atur jadwal</li>
                   <li className={cn(step >= 3 && "text-primary font-medium")}>3. Bayar</li>
-                  <li className={cn(
-                    bookingStatus === "pending_approval" && "text-primary font-medium",
-                    bookingStatus === "approved" && "text-green-500 font-medium"
-                  )}>
-                    4. Tunggu approval admin {bookingStatus === "approved" && "✓"}
-                  </li>
-                  <li className={cn(
-                    bookingStatus === "approved" && "text-green-500 font-medium"
-                  )}>
-                    5. Percakapan aktif {bookingStatus === "approved" && "✓"}
-                  </li>
+                  <li className={cn(bookingStatus === "pending_approval" && "text-primary font-medium", bookingStatus === "approved" && "text-green-500 font-medium")}>4. Tunggu approval admin {bookingStatus === "approved" && "✓"}</li>
+                  <li className={cn(bookingStatus === "approved" && "text-green-500 font-medium")}>5. Percakapan aktif {bookingStatus === "approved" && "✓"}</li>
                 </ol>
               </div>
             </Card>

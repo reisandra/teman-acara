@@ -69,7 +69,6 @@ export interface Talent {
   city: string;
   gender: "Pria" | "Wanita";
   photo: string;
-  // HAPUS field gallery
   skills: string[];
   bio: string;
   pricePerHour: number;
@@ -78,8 +77,10 @@ export interface Talent {
   rules: string[];
   availability: "online" | "offline" | "both";
   verified: boolean;
-  email: string; // Tambahkan field email
-  password: string; // Tambahkan field password
+  email: string; 
+  password: string; 
+   created_at?: string; 
+  updated_at?: string;
 }
 
 // Foto unik untuk setiap teman - tidak ada duplikasi
@@ -706,6 +707,7 @@ export interface Review {
   rating: number;
   comment: string;
   date: string;
+   created_at?: string;
 }
 
 // Reviews with unique reviewers - different photos and comments
@@ -900,6 +902,14 @@ export interface Booking {
   status: "active" | "completed" | "cancelled";
   totalPrice: number;
   createdAt: string;
+  booker_id?: string;
+  booker_name?: string;
+  booker_photo?: string;
+  talent_name?: string; 
+  talent_photo?: string; 
+  payment_status?: string; 
+  approval_status?: string;
+  updated_at?: string;
 }
 
 export interface ChatRoom {

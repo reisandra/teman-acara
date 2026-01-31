@@ -1,5 +1,4 @@
-// src/lib/bookingStore.ts
-
+import { supabase } from './supabase';
 import { getOrCreateChatSession } from "./chatStore";
 import { getCurrentMitra } from "./mitraStore";
 import { getCurrentUser } from "./userStore";
@@ -7,18 +6,15 @@ import { getAppCommission, calculatePaymentSplit } from "./paymentUtils";
 
 export interface SharedBooking {
   id: string;
-
   userName: string;
   userPhoto: string;
   
   // Field untuk membedakan pemesan
   bookerType: "user" | "mitra";
   bookerId: string;
-
   talentId: string;
   talentName: string;
   talentPhoto: string;
-
   purpose: string;
   type: "online" | "offline";
   date: string;
@@ -26,124 +22,132 @@ export interface SharedBooking {
   duration: number;
   total: number;
   notes?: string;
-
   paymentStatus: "pending" | "paid";
-  // PERBAIKAN: Menambahkan status "completed"
   approvalStatus: "pending_approval" | "approved" | "rejected" | "completed";
-
   paymentMethod?: "qris" | "bca" | "bri" | "mandiri";
   paymentCode?: string;
   paymentProof?: string;
   transferAmount?: number;
   transferTime?: string;
-
-  // Informasi pembagian pembayaran
   paymentSplit?: {
     appAmount: number;
     mitraAmount: number;
     totalAmount: number;
     commissionPercentage: number;
   };
-
   createdAt: string;
-
+  updatedAt?: string;
   rating?: number;
   ratingComment?: string;
 }
 
-const STORAGE_KEY = "rentmate_bookings";
+// Helper function to convert camelCase to snake_case
+const camelToSnake = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Array) return obj.map(item => camelToSnake(item));
+  
+  const result: any = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      result[snakeKey] = camelToSnake(obj[key]);
+    }
+  }
+  return result;
+};
 
-/* ======================
-   INTERNAL HELPERS
-====================== */
+// Helper function to convert snake_case to camelCase
+const snakeToCamel = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Array) return obj.map(item => snakeToCamel(item));
 
-function isBrowser(): boolean {
-  return typeof window !== "undefined";
-}
+  const result: any = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      result[camelKey] = snakeToCamel(obj[key]);
+    }
+  }
+  return result;
+};
 
-function read(): SharedBooking[] {
-  if (!isBrowser()) return [];
+// ======================
+//   DATABASE FUNCTIONS
+// ======================
+
+// GET ALL FROM SUPABASE
+export async function getBookings(): Promise<SharedBooking[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching bookings:', error);
+      return [];
+    }
+    return snakeToCamel(data) || [];
+  } catch (error) {
+    console.error('Failed to fetch bookings:', error);
     return [];
   }
 }
 
-function write(data: SharedBooking[]) {
-  if (!isBrowser()) return;
-  
+// GET BY ID FROM SUPABASE
+export async function getBookingById(id: string): Promise<SharedBooking | null> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    window.dispatchEvent(new CustomEvent("bookingsUpdated"));
-  } catch (error) {
-    if (error instanceof QuotaExceededError) {
-      console.error("Error: Kuota penyimpanan localStorage penuh.");
-      alert("Maaf, ruang penyimpanan browser Anda penuh. Silakan hapus data yang tidak penting di pengaturan browser dan coba lagi.");
-    } else {
-      console.error("Gagal menyimpan data booking:", error);
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching booking:', error);
+      return null;
     }
+    return snakeToCamel(data);
+  } catch (error) {
+    console.error('Failed to fetch booking:', error);
+    return null;
   }
 }
 
-function pruneOldBookings(days = 30) {
-  const now = Date.now();
-  const limit = days * 24 * 60 * 60 * 1000;
-  const fresh = read().filter(b => {
-    return now - new Date(b.createdAt).getTime() < limit;
-  });
-  write(fresh);
-}
+// ADD TO SUPABASE
+export async function addBooking(
+  booking: Omit<SharedBooking, "id" | "createdAt" | "updatedAt" | "paymentSplit">
+): Promise<SharedBooking> {
+  try {
+    const dbBooking = camelToSnake({
+      ...booking,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    
+    console.log('Creating booking with data:', dbBooking);
+    
+    const { data, error } = await supabase
+      .from('bookings')
+      .insert(dbBooking)
+      .select()
+      .single();
 
-/* ======================
-   PUBLIC API
-====================== */
+    if (error) {
+      console.error('Error creating booking:', error);
+      throw error;
+    }
 
-// GET ALL
-export function getBookings(): SharedBooking[] {
-  const bookings = read();
-  
-  // Pastikan semua booking memiliki field baru untuk backward compatibility
-  return bookings.map(booking => ({
-    ...booking,
-    bookerType: booking.bookerType || "user",
-    bookerId: booking.bookerId || "",
-  }));
-}
-
-// GET BY ID
-export function getBookingById(id: string): SharedBooking | undefined {
-  return read().find(b => b.id === id);
-}
-
-// ADD (USER/MITRA)
-export function addBooking(
-  booking: Omit<SharedBooking, "id" | "createdAt" | "paymentSplit">
-): SharedBooking {
-  const all = read();
-  const newBooking: SharedBooking = {
-    ...booking,
-    id: `booking_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    createdAt: new Date().toISOString(),
-    // Default values untuk field baru
-    bookerType: booking.bookerType || "user",
-    bookerId: booking.bookerId || "",
-  };
-  all.unshift(newBooking);
-
-  const MAX_BOOKINGS = 100;
-  if (all.length > MAX_BOOKINGS) {
-    console.log(`Jumlah booking melebihi ${MAX_BOOKINGS}, menghapus booking terlama.`);
-    all.splice(MAX_BOOKINGS); 
+    console.log('✅ Booking created in Supabase:', data);
+    return snakeToCamel(data);
+  } catch (error) {
+    console.error('Failed to create booking:', error);
+    throw error;
   }
-
-  write(all);
-  return newBooking;
 }
 
-// USER PAYMENT SUBMIT
-export function updateBookingPayment(
+// UPDATE PAYMENT IN SUPABASE
+export async function updateBookingPayment(
   id: string,
   data: {
     paymentMethod: "qris" | "bca" | "bri" | "mandiri";
@@ -152,228 +156,488 @@ export function updateBookingPayment(
     transferAmount?: number;
     transferTime: string;
   }
-): SharedBooking | undefined {
-  const all = read();
-  const idx = all.findIndex(b => b.id === id);
-  if (idx === -1) return undefined;
+): Promise<SharedBooking> {
+  try {
+    const commissionPercentage = getAppCommission();
+    const paymentSplit = calculatePaymentSplit(data.transferAmount || 0, commissionPercentage);
 
-  const commissionPercentage = getAppCommission();
-  const paymentSplit = calculatePaymentSplit(all[idx].total || 0, commissionPercentage);
+    const dbData = camelToSnake({
+      ...data,
+      paymentStatus: "paid",
+      approvalStatus: "pending_approval",
+      paymentSplit,
+      updatedAt: new Date().toISOString()
+    });
 
-  all[idx] = {
-    ...all[idx],
-    ...data,
-    paymentStatus: "paid",
-    approvalStatus: "pending_approval",
-    paymentSplit,
-  };
+    const { data: updatedBooking, error } = await supabase
+      .from('bookings')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
 
-  const updatedBooking = all[idx];
+    if (error) {
+      console.error('Error updating payment:', error);
+      throw error;
+    }
 
-  write(all);
-  return updatedBooking;
+    console.log('✅ Payment updated in Supabase:', updatedBooking);
+    return snakeToCamel(updatedBooking);
+  } catch (error) {
+    console.error('Failed to update payment:', error);
+    throw error;
+  }
 }
 
-// FUNGSI UNTUK MENDAPATKAN USER ATAU MITRA YANG SEDANG LOGIN
-export function getCurrentUserOrMitra() {
-  const isMitraAuthenticated = localStorage.getItem("mitraAuthenticated");
-  const currentMitra = getCurrentMitra();
-  
-  if (isMitraAuthenticated && currentMitra) {
-    return { type: "mitra", data: currentMitra };
+// UPDATE APPROVAL IN SUPABASE
+export async function updateBookingApproval(
+  id: string,
+  status: "approved" | "rejected"
+): Promise<SharedBooking> {
+  try {
+    const { data: currentBooking } = await supabase
+      .from('bookings')
+      .select('total')
+      .eq('id', id)
+      .single();
+
+    if (!currentBooking) {
+      throw new Error('Booking not found');
+    }
+
+    const commissionPercentage = getAppCommission();
+    const paymentSplit = calculatePaymentSplit(currentBooking.total || 0, commissionPercentage);
+
+    const dbData = camelToSnake({
+      approvalStatus: status,
+      paymentSplit,
+      updatedAt: new Date().toISOString()
+    });
+
+    const { data: updatedBooking, error } = await supabase
+      .from('bookings')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating approval:', error);
+      throw error;
+    }
+
+    const camelCaseBooking = snakeToCamel(updatedBooking);
+
+    if (status === 'approved') {
+      console.log(`Booking ${id} telah disetujui.`);
+      getOrCreateChatSession(camelCaseBooking);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("bookingApproved", { 
+          detail: { booking: camelCaseBooking, timestamp: new Date().toISOString() } 
+        }));
+      }
+    }
+
+    return camelCaseBooking;
+  } catch (error) {
+    console.error('Failed to update approval:', error);
+    throw error;
   }
+}
+
+// MARK AS COMPLETED IN SUPABASE
+export async function markBookingAsCompleted(id: string): Promise<SharedBooking> {
+  try {
+    const { data: currentBooking } = await supabase
+      .from('bookings')
+      .select('approval_status')
+      .eq('id', id)
+      .single();
+
+    if (!currentBooking) {
+      throw new Error('Booking not found');
+    }
+
+    if (currentBooking.approval_status !== "approved") {
+      throw new Error(`Cannot complete booking with status: ${currentBooking.approval_status}`);
+    }
+
+    const dbData = camelToSnake({
+      approvalStatus: "completed",
+      updatedAt: new Date().toISOString()
+    });
+
+    const { data: updatedBooking, error } = await supabase
+      .from('bookings')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error marking as completed:', error);
+      throw error;
+    }
+    
+    const camelCaseBooking = snakeToCamel(updatedBooking);
+    
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("bookingCompleted", { 
+        detail: { booking: camelCaseBooking, timestamp: new Date().toISOString() } 
+      }));
+    }
+
+    return camelCaseBooking;
+  } catch (error) {
+    console.error('Failed to mark as completed:', error);
+    throw error;
+  }
+}
+
+// GET PENDING BOOKINGS FROM SUPABASE
+export async function getPendingBookings(): Promise<SharedBooking[]> {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('payment_status', 'paid')
+      .eq('approval_status', 'pending_approval')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching pending bookings:', error);
+      return [];
+    }
+    return snakeToCamel(data) || [];
+  } catch (error) {
+    console.error('Failed to fetch pending bookings:', error);
+    return [];
+  }
+}
+
+// GET ACTIVE BOOKINGS BY TALENT FROM SUPABASE
+export async function getActiveBookingByTalent(talentId: string): Promise<SharedBooking | null> {
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('talent_id', talentId)
+      .eq('approval_status', 'approved')
+      .gt('date', now)
+      .order('date', { ascending: true })
+      .limit(1);
+    
+    if (error) {
+      console.error('Error fetching active booking:', error);
+      return null;
+    }
+    
+    if (data && data.length > 0) {
+      const booking = snakeToCamel(data[0]);
+      const endTime = new Date(`${booking.date}T${booking.time}`);
+      endTime.setHours(endTime.getHours() + booking.duration);
+      if (endTime > new Date()) {
+        return booking;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch active booking:', error);
+    return null;
+  }
+}
+
+// REAL-TIME SUBSCRIPTION
+export function subscribeToBookings(callback: (booking: SharedBooking) => void) {
+  const channel = supabase
+    .channel('bookings')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        callback(snakeToCamel(payload.new) as SharedBooking);
+      }
+    })
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+// ======================
+//   LEGACY & HELPER FUNCTIONS
+// ======================
+
+export async function getBookingByUserAndTalent(userId: string, talentId: string): Promise<SharedBooking | null> { 
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('booker_id', userId)
+      .eq('talent_id', talentId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching booking:', error);
+      return null;
+    }
+    return snakeToCamel(data);
+  } catch (error) {
+    console.error('Failed to fetch booking:', error);
+    return null;
+  }
+}
+
+// SATU-SATUNYA FUNGSI getBookingsByUser YANG BENAR
+export async function getBookingsByUser(userId: string): Promise<SharedBooking[]> { 
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('booker_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching user bookings:', error);
+      return [];
+    }
+    return snakeToCamel(data) || [];
+  } catch (error) {
+    console.error('Failed to fetch user bookings:', error);
+    return [];
+  }
+}
+
+export async function getCompletedBookings(): Promise<SharedBooking[]> { 
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('approval_status', 'completed')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching completed bookings:', error);
+      return [];
+    }
+    return snakeToCamel(data) || [];
+  } catch (error) {
+    console.error('Failed to fetch completed bookings:', error);
+    return [];
+  }
+}
+
+export async function getActiveBookings(): Promise<SharedBooking[]> { 
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('approval_status', 'approved')
+      .lte('date', now)
+      .order('date', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching active bookings:', error);
+      return [];
+    }
+    
+    const camelCaseData = snakeToCamel(data) || [];
+    const currentDateTime = new Date();
+    return camelCaseData.filter(booking => {
+      const startTime = new Date(`${booking.date}T${booking.time}`);
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + booking.duration);
+      return startTime <= currentDateTime && currentDateTime < endTime;
+    });
+  } catch (error) {
+    console.error('Failed to fetch active bookings:', error);
+    return [];
+  }
+}
+
+export async function getPendingPaymentBookings(): Promise<SharedBooking[]> { 
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('payment_status', 'pending')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching pending payment bookings:', error);
+      return [];
+    }
+    return snakeToCamel(data) || [];
+  } catch (error) {
+    console.error('Failed to fetch pending payment bookings:', error);
+    return [];
+  }
+}
+
+export async function getPendingApprovalBookings(): Promise<SharedBooking[]> { 
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('approval_status', 'pending_approval')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching pending approval bookings:', error);
+      return [];
+    }
+    return snakeToCamel(data) || [];
+  } catch (error) {
+    console.error('Failed to fetch pending approval bookings:', error);
+    return [];
+  }
+}
+
+export async function deleteBooking(id: string): Promise<boolean> { 
+  try {
+    const { error } = await supabase.from('bookings').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting booking:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Failed to delete booking:', error);
+    return false;
+  }
+}
+
+export async function updateBooking(id: string, data: Partial<SharedBooking>): Promise<SharedBooking | null> { 
+  try {
+    const dbData = camelToSnake({ ...data, updatedAt: new Date().toISOString() });
+    const { data: updatedBooking, error } = await supabase
+      .from('bookings')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating booking:', error);
+      return null;
+    }
+    return snakeToCamel(updatedBooking);
+  } catch (error) {
+    console.error('Failed to update booking:', error);
+    return null;
+  }
+}
+
+export async function isTimeSlotBooked(talentId: string, date: string, time: string, duration: number, excludeBookingId?: string): Promise<boolean> {
+  try {
+    let query = supabase
+      .from('bookings')
+      .select('*')
+      .eq('talent_id', talentId)
+      .eq('date', date)
+      .eq('approval_status', 'approved');
+    
+    if (excludeBookingId) {
+      query = query.neq('id', excludeBookingId);
+    }
+    
+    const { data, error } = await query;
+    if (error || !data) return false;
+    
+    const camelCaseData = snakeToCamel(data) || [];
+    const newStartTime = new Date(`${date}T${time}`);
+    const newEndTime = new Date(newStartTime.getTime() + duration * 60 * 60 * 1000);
+    
+    return camelCaseData.some(booking => {
+      const bookingStartTime = new Date(`${booking.date}T${booking.time}`);
+      const bookingEndTime = new Date(bookingStartTime.getTime() + booking.duration * 60 * 60 * 1000);
+      return (newStartTime >= bookingStartTime && newStartTime < bookingEndTime) ||
+             (newEndTime > bookingStartTime && newEndTime <= bookingEndTime) ||
+             (newStartTime <= bookingStartTime && newEndTime >= bookingEndTime);
+    });
+  } catch (error) {
+    console.error('Failed to check time slot:', error);
+    return false;
+  }
+}
+
+export function getCurrentUserOrMitra() {
+  const isMitraAuthenticated = typeof window !== "undefined" && localStorage.getItem("mitraAuthenticated");
+  const currentMitra = getCurrentMitra();
+  if (isMitraAuthenticated && currentMitra) return { type: "mitra", data: currentMitra };
   
   const currentUser = getCurrentUser();
-  if (currentUser) {
-    return { type: "user", data: currentUser };
-  }
+  if (currentUser) return { type: "user", data: currentUser };
   
   return null;
 }
 
-// UPDATE BOOKING APPROVAL
-export function updateBookingApproval(
-  id: string,
-  status: "approved" | "rejected"
-): SharedBooking | undefined {
-  const all = read();
-  const idx = all.findIndex(b => b.id === id);
-  if (idx === -1) return undefined;
-
-  const commissionPercentage = getAppCommission();
-  const paymentSplit = calculatePaymentSplit(all[idx].total || 0, commissionPercentage);
-
-  all[idx] = {
-    ...all[idx],
-    approvalStatus: status,
-    paymentSplit,
-  };
-
-  const updatedBooking = all[idx];
-
-  if (status === 'approved') {
-    console.log(`Booking ${id} telah disetujui. Pembagian: Aplikasi ${paymentSplit.appAmount}, Talent ${paymentSplit.mitraAmount}`);
+export async function calculateMitraEarnings(mitraId: string, isTalentMode: boolean = true): Promise<number> {
+  try {
+    const allBookings = await getBookings();
+    const commissionPercentage = getAppCommission();
     
-    // Buat sesi chat untuk booking yang disetujui
-    getOrCreateChatSession(updatedBooking);
+    let mitraBookings: SharedBooking[];
     
-    // Kirim notifikasi ke semua browser yang terbuka
-    window.dispatchEvent(new CustomEvent("bookingApproved", { 
-      detail: { 
-        booking: updatedBooking,
-        timestamp: new Date().toISOString()
-      } 
-    }));
+    if (isTalentMode) {
+      mitraBookings = allBookings.filter((booking) => booking.talentId === mitraId);
+    } else {
+      mitraBookings = allBookings.filter(
+        (booking) => booking.bookerId === mitraId && booking.bookerType === "mitra"
+      );
+    }
+    
+    const completedBookings = mitraBookings.filter((booking) => booking.approvalStatus === "completed");
+    
+    const totalRevenue = completedBookings.reduce((sum, booking) => {
+      const totalAmount = parseFloat(booking.total) || 0;
+      const mitraAmount = Math.round(totalAmount * ((100 - commissionPercentage) / 100));
+      return sum + mitraAmount;
+    }, 0);
+    
+    return totalRevenue;
+  } catch (error) {
+    console.error('Failed to calculate mitra earnings:', error);
+    return 0;
   }
-
-  write(all);
-  return updatedBooking;
 }
 
-// PERBAIKAN: Fungsi baru untuk menandai booking sebagai selesai
-export function markBookingAsCompleted(id: string): SharedBooking | undefined {
-  const all = read();
-  const idx = all.findIndex(b => b.id === id);
-  if (idx === -1) return undefined;
-
-  // Hanya boleh menandai sebagai selesai jika statusnya "approved"
-  if (all[idx].approvalStatus !== "approved") {
-    console.warn(`Attempted to complete booking ${id} which is not approved. Current status: ${all[idx].approvalStatus}`);
-    return undefined;
+export async function checkAndUpdateCompletedBookings(): Promise<void> {
+  try {
+    const allBookings = await getBookings();
+    const currentDateTime = new Date();
+    
+    const approvedBookings = allBookings.filter(b => b.approvalStatus === 'approved');
+    
+    for (const booking of approvedBookings) {
+      const endTime = new Date(`${booking.date}T${booking.time}`);
+      endTime.setHours(endTime.getHours() + booking.duration);
+      
+      if (endTime < currentDateTime) {
+        console.log(`Automatically completing booking ${booking.id} as its end time has passed.`);
+        await markBookingAsCompleted(booking.id);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to check and update completed bookings:', error);
   }
+}  
 
-  all[idx] = {
-    ...all[idx],
-    approvalStatus: "completed",
-  };
-
-  const updatedBooking = all[idx];
-  write(all);
-
-  console.log(`Booking ${id} telah ditandai sebagai selesai.`);
-  
-  // Kirim notifikasi spesifik bahwa booking telah selesai
-  window.dispatchEvent(new CustomEvent("bookingCompleted", { 
-    detail: { 
-      booking: updatedBooking,
-      timestamp: new Date().toISOString()
-    } 
-  }));
-
-  return updatedBooking;
-}
-
-// ADMIN LIST
-export function getPendingBookings(): SharedBooking[] {
-  return read().filter(
-    b =>
-      b.paymentStatus === "paid" &&
-      b.approvalStatus === "pending_approval"
-  );
-}
-
-// TALENT ACTIVE BOOKING
-export function getActiveBookingByTalent(
-  talentId: string
-): SharedBooking | undefined {
-  const now = new Date();
-  return read().find(b => {
-    if (b.talentId !== talentId) return false;
-    if (b.approvalStatus !== "approved") return false;
-    const t = new Date(`${b.date}T${b.time}`);
-    return t > now;
-  });
-}
-
-// SUBSCRIBE
-export function subscribeToBookings(cb: () => void): () => void {
-  if (!isBrowser()) return () => {};
-  window.addEventListener("bookingsUpdated", cb);
-  return () => window.removeEventListener("bookingsUpdated", cb);
-}
-
-// UPDATE RATING
-export function updateBookingRating(
-  id: string,
-  rating: number,
-  comment?: string
-): SharedBooking | undefined {
-  const all = read();
-  const idx = all.findIndex(b => b.id === id);
-  if (idx === -1) return undefined;
-
-  const updatedBooking = {
-    ...all[idx],
-    rating,
-    ratingComment: comment,
-  };
-
-  all[idx] = updatedBooking;
-  write(all);
-  
-  window.dispatchEvent(new CustomEvent("bookingUpdated", { detail: updatedBooking }));
-  
-  return updatedBooking;
-}
-
-// PERBAIKAN: Fungsi untuk menghitung pendapatan mitra yang sudah selesai
-export function calculateMitraEarnings(mitraId: string, isTalentMode: boolean = true): number {
-  const allBookings = getBookings();
-  const commissionPercentage = getAppCommission();
-  
-  let mitraBookings: SharedBooking[];
-  
-  if (isTalentMode) {
-    // Filter di mana mitra ini adalah TALENT yang di-booking
-    mitraBookings = allBookings.filter(
-      (booking) => booking.talentId === mitraId
-    );
-  } else {
-    // Filter di mana mitra ini adalah USER yang melakukan pemesanan
-    mitraBookings = allBookings.filter(
-      (booking) => 
-        booking.bookerId === mitraId && 
-        booking.bookerType === "mitra"
-    );
-  }
-  
-  // PERBAIKAN: Filter hanya booking yang sudah benar-benar selesai
-  const completedBookings = mitraBookings.filter((booking) => {
-    return booking.approvalStatus === "completed";
-  });
-  
-  // Hitung total pendapatan mitra (setelah dipotong komisi)
-  const totalRevenue = completedBookings.reduce((sum, booking) => {
-    const totalAmount = booking.total || 0;
-    const mitraAmount = Math.round(totalAmount * ((100 - commissionPercentage) / 100));
-    return sum + mitraAmount;
-  }, 0);
-  
-  return totalRevenue;
-}
-
-// PERBAIKAN: Event listener untuk booking yang selesai
 export function subscribeToCompletedBookings(mitraId: string, callback: () => void, isTalentMode: boolean = true): () => void {
-  if (!isBrowser()) return () => {};
+  if (typeof window === "undefined") return () => {};
   
-  // Simpan ID booking yang sudah selesai untuk mencegah notifikasi ganda
   let completedBookingsIds: Set<string> = new Set();
   
-  const initializeCompletedIds = () => {
-    const allBookings = getBookings();
+  const initializeCompletedIds = async () => {
+    const allBookings = await getBookings();
     allBookings.forEach(booking => {
       const isRelevant = isTalentMode 
         ? booking.talentId === mitraId && booking.approvalStatus === "completed"
         : booking.bookerId === mitraId && booking.bookerType === "mitra" && booking.approvalStatus === "completed";
-
-      if (isRelevant) {
-        completedBookingsIds.add(booking.id);
-      }
+      if (isRelevant) completedBookingsIds.add(booking.id);
     });
   };
 
-  const checkForNewCompletedBookings = () => {
-    const allBookings = getBookings();
+  const checkForNewCompletedBookings = async () => {
+    const allBookings = await getBookings();
     let hasNewCompletedBooking = false;
     
     allBookings.forEach(booking => {
@@ -381,197 +645,36 @@ export function subscribeToCompletedBookings(mitraId: string, callback: () => vo
         ? booking.talentId === mitraId
         : booking.bookerId === mitraId && booking.bookerType === "mitra";
 
-      if (isRelevant && booking.approvalStatus === "completed") {
-        // Jika ID ini belum ada di set kita, ini adalah booking baru yang selesai
-        if (!completedBookingsIds.has(booking.id)) {
-          completedBookingsIds.add(booking.id);
-          hasNewCompletedBooking = true;
-        }
+      if (isRelevant && booking.approvalStatus === "completed" && !completedBookingsIds.has(booking.id)) {
+        completedBookingsIds.add(booking.id);
+        hasNewCompletedBooking = true;
       }
     });
     
-    if (hasNewCompletedBooking) {
-      callback();
-    }
+    if (hasNewCompletedBooking) callback();
   };
   
-  // Inisialisasi daftar booking yang sudah selesai saat pertama kali subscribe
   initializeCompletedIds();
-
-  // Cek setiap menit untuk booking yang baru selesai
   const intervalId = setInterval(checkForNewCompletedBookings, 60000);
   
-  // Cek saat ada update booking
   const handleBookingUpdate = (event: CustomEvent) => {
-    // Jika event spesifik "bookingCompleted", langsung periksa
     if (event.type === 'bookingCompleted' && event.detail?.booking) {
       const booking = event.detail.booking;
       const isRelevant = isTalentMode 
         ? booking.talentId === mitraId
         : booking.bookerId === mitraId && booking.bookerType === "mitra";
-      
-      if (isRelevant) {
-        callback();
-      }
+      if (isRelevant) callback();
     } else {
-      // Untuk event lain, beri jeda singkat sebelum memeriksa
       setTimeout(checkForNewCompletedBookings, 1000);
     }
   };
   
   window.addEventListener("bookingsUpdated", handleBookingUpdate as EventListener);
   window.addEventListener("bookingCompleted", handleBookingUpdate as EventListener);
-  
+    
   return () => {
     clearInterval(intervalId);
     window.removeEventListener("bookingsUpdated", handleBookingUpdate as EventListener);
     window.removeEventListener("bookingCompleted", handleBookingUpdate as EventListener);
   };
-}
-
-// PERBAIKAN: Fungsi untuk menandai booking yang sudah selesai secara otomatis
-export function checkAndUpdateCompletedBookings(): void {
-  if (!isBrowser()) return;
-  
-  const allBookings = getBookings();
-  const now = new Date();
-  let hasUpdates = false;
-  
-  const updatedBookings = allBookings.map(booking => {
-    // Skip jika sudah ditandai selesai, ditolak, atau masih menunggu persetujuan
-    if (booking.approvalStatus === "completed" || booking.approvalStatus === "rejected" || booking.approvalStatus === "pending_approval") {
-      return booking;
-    }
-    
-    // Hanya proses booking yang sudah disetujui
-    if (booking.approvalStatus !== "approved") {
-      return booking;
-    }
-    
-    // Hitung waktu selesai booking
-    const endTime = new Date(`${booking.date}T${booking.time}`);
-    endTime.setHours(endTime.getHours() + booking.duration);
-    
-    // Jika waktu selesai sudah lewat, tandai sebagai selesai
-    if (endTime < now) {
-      console.log(`Automatically completing booking ${booking.id} as its end time has passed.`);
-      hasUpdates = true;
-      return {
-        ...booking,
-        approvalStatus: "completed"
-      };
-    }
-    
-    return booking;
-  });
-  
-  // Jika ada update, simpan perubahan
-  if (hasUpdates) {
-    write(updatedBookings);
-    
-    // Kirim notifikasi untuk setiap booking yang baru selesai
-    allBookings.forEach(originalBooking => {
-      const updatedBooking = updatedBookings.find(b => b.id === originalBooking.id);
-      if (updatedBooking && updatedBooking.approvalStatus === "completed" && originalBooking.approvalStatus === "approved") {
-        window.dispatchEvent(new CustomEvent("bookingCompleted", { 
-          detail: { 
-            booking: updatedBooking,
-            timestamp: new Date().toISOString()
-          } 
-        }));
-      }
-    });
-  }
-}
-
-// Fungsi lainnya yang tidak terkait chat tetap bisa dipertahankan
-export function getBookingByUserAndTalent(userId: string, talentId: string): SharedBooking | undefined { 
-  return read().find(b => b.bookerId === userId && b.talentId === talentId); 
-}
-
-export function getBookingsByUser(userId: string): SharedBooking[] { 
-  return read().filter(b => b.bookerId === userId); 
-}
-
-// PERBAIKAN: Gunakan status "completed" yang baru
-export function getCompletedBookings(): SharedBooking[] { 
-  return read().filter(b => b.approvalStatus === "completed");
-}
-
-export function getActiveBookings(): SharedBooking[] { 
-  const now = new Date();
-  return read().filter(b => {
-    if (b.approvalStatus !== "approved") return false;
-    const startTime = new Date(`${b.date}T${b.time}`);
-    const endTime = new Date(startTime);
-    endTime.setHours(endTime.getHours() + b.duration);
-    return startTime <= now && now < endTime;
-  });
-}
-
-export function getPendingPaymentBookings(): SharedBooking[] { 
-  return read().filter(b => b.paymentStatus === "pending"); 
-}
-
-export function getPendingApprovalBookings(): SharedBooking[] { 
-  return read().filter(b => b.approvalStatus === "pending_approval"); 
-}
-
-export function deleteBooking(id: string): boolean { 
-  const all = read();
-  const idx = all.findIndex(b => b.id === id);
-  if (idx === -1) return false;
-  
-  all.splice(idx, 1);
-  write(all);
-  return true;
-}
-
-export function updateBooking(id: string, data: Partial<SharedBooking>): SharedBooking | undefined { 
-  const all = read();
-  const idx = all.findIndex(b => b.id === id);
-  if (idx === -1) return undefined;
-  
-  all[idx] = { ...all[idx], ...data };
-  write(all);
-  return all[idx];
-}
-
-export function isTimeSlotBooked(talentId: string, date: string, time: string, duration: number, excludeBookingId?: string): boolean { 
-  const allBookings = read();
-  
-  return allBookings.some(booking => {
-    if (booking.id === excludeBookingId) return false;
-    if (booking.talentId !== talentId) return false;
-    if (booking.approvalStatus !== "approved") return false;
-    if (booking.date !== date) return false;
-    
-    const bookingStartTime = new Date(`${date}T${booking.time}`);
-    const bookingEndTime = new Date(bookingStartTime);
-    bookingEndTime.setHours(bookingEndTime.getHours() + booking.duration);
-    
-    const newStartTime = new Date(`${date}T${time}`);
-    const newEndTime = new Date(newStartTime);
-    newEndTime.setHours(newEndTime.getHours() + duration);
-    
-    return (
-      (newStartTime >= bookingStartTime && newStartTime < bookingEndTime) ||
-      (newEndTime > bookingStartTime && newEndTime <= bookingEndTime) ||
-      (newStartTime <= bookingStartTime && newEndTime >= bookingEndTime)
-    );
-  });
-}
-
-// Inisialisasi saat halaman dimuat
-if (typeof window !== "undefined") {
-  // Bersihkan booking lama setelah halaman dimuat
-  setTimeout(() => {
-    pruneOldBookings();
-  }, 1000);
-
-  // PERBAIKAN: Jalankan pemeriksaan booking selesai setiap 5 menit
-  setInterval(checkAndUpdateCompletedBookings, 5 * 60 * 1000);
-  
-  // Juga jalankan sekali saat halaman dimuat untuk menangkap booking yang mungkin selesai saat aplikasi tertutup
-  setTimeout(checkAndUpdateCompletedBookings, 2000);
 }

@@ -1,4 +1,3 @@
-// src/components/mitra/MitraAuth.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';

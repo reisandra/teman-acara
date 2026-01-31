@@ -104,6 +104,7 @@ export default function Admin() {
   const { settings, updateSettings } = useAppSettings(); 
   const [searchQuery, setSearchQuery] = useState("");
   const [bookings, setBookings] = useState<SharedBooking[]>([]);
+  const [allBookingsForRevenue, setAllBookingsForRevenue] = useState<SharedBooking[]>([]); // State baru untuk pendapatan
   const { toast } = useToast();
   const [stats, setStats] = useState<StatItem[]>([
     { label: "Total Pengguna", value: "0", icon: Users },
@@ -160,6 +161,7 @@ export default function Admin() {
   // State untuk dialog detail transaksi
   const [showTransactionDialog, setShowTransactionDialog] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<SharedBooking | null>(null);
+
 
   // State untuk manajemen kota
   const [cities, setCities] = useState<string[]>(() => {
@@ -266,6 +268,22 @@ export default function Admin() {
     }
   };
 
+
+  // Tambahkan useEffect ini di mana saja dengan useEffect lainnya
+useEffect(() => {
+  const fetchAllBookingsForRevenue = async () => {
+    try {
+      const allBookings = await getBookings();
+      setAllBookingsForRevenue(allBookings);
+    } catch (error) {
+      console.error("Gagal mengambil data booking untuk pendapatan:", error);
+      setAllBookingsForRevenue([]);
+    }
+  };
+
+  fetchAllBookingsForRevenue();
+}, []); 
+
   // Fungsi untuk menghitung pembagian pembayaran
   const calculatePaymentSplit = (totalAmount: number, commissionPercentage: number): PaymentSplit => {
     const appAmount = Math.round(totalAmount * (commissionPercentage / 100));
@@ -299,18 +317,17 @@ export default function Admin() {
     }).format(amount);
   };
 
-  // PERFORMA: Pisahkan fungsi untuk memuat data awal (kritis) dan data tambahan (non-kritis)
-  const loadInitialData = useCallback(async () => {
-    console.log("🔄 Admin: Memuat data awal...");
-    setIsInitialLoading(true);
-    
-    // PERBAIKAN: Langsung ambil data pending bookings di sini
-    const pendingBookingsData = getPendingBookings();
-    const processedBookings = pendingBookingsData.map(booking => ({
-      ...booking,
-      paymentStatus: (booking.paymentProof ? "paid" : "unpaid") as PaymentStatus,
-    }));
-    setBookings(processedBookings);
+const loadInitialData = useCallback(async () => {
+  console.log("🔄 Admin: Memuat data awal...");
+  setIsInitialLoading(true);
+
+  const pendingBookingsData = await getPendingBookings(); 
+  const processedBookings = pendingBookingsData.map(booking => ({
+    ...booking,
+    paymentStatus: (booking.paymentProof ? "paid" : "unpaid") as PaymentStatus,
+  }));
+  setBookings(processedBookings);
+
 
     // Muat data talent sekali, lalu gunakan hasilnya untuk update stats
     try {
@@ -328,11 +345,11 @@ export default function Admin() {
 
   // PERFORMA: Modifikasi updateStats untuk menerima data talent sebagai parameter
   // Ini mencegah pemanggilan API ganda
-  const updateStats = useCallback((verifiedTalents: any[] = []) => {
-    console.log("🔄 Admin: Memperbarui statistik...");
-    setIsLoadingStats(true);
-    try {
-      const allBookings = getBookings();
+  const updateStats = useCallback(async (verifiedTalents: any[] = []) => {
+  console.log("🔄 Admin: Memperbarui statistik...");
+  setIsLoadingStats(true);
+  try {
+      const allBookings = await getBookings();
       const currentUser = getCurrentUser();
 
       let totalUsers = 0;
@@ -673,22 +690,18 @@ export default function Admin() {
   };
 
   // PERBAIKAN: Fungsi handleApproveBooking yang diperbaiki
-  const handleApproveBooking = (bookingId: string) => {
+  const handleApproveBooking = async (bookingId: string) => {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) return;
     
     const commissionPercentage = getAppCommission();
     const paymentSplit = calculatePaymentSplit(booking.total || 0, commissionPercentage);
     
-    // 1. Update status di penyimpanan
-    updateBookingApproval(bookingId, "approved");
-    
-    // 2. PERBAIKAN: Langsung update state lokal dengan memfilter item yang diproses
-    // Ini jauh lebih cepat dan andal dari pada loadBookings()
+    await updateBookingApproval(bookingId, "approved");
+  
     setBookings(currentBookings => currentBookings.filter(b => b.id !== bookingId));
     
-    // 3. Update statistik
-    updateStats(allTalents);
+    await updateStats(allTalents);
     
     toast({
       title: "Pemesanan Disetujui",
@@ -715,14 +728,14 @@ export default function Admin() {
   };
 
   // Fungsi untuk menampilkan detail transaksi
-  const handleViewTransaction = (transactionId: string) => {
-    const allBookings = getBookings();
-    const transaction = allBookings.find(b => b.id === transactionId);
-    if (transaction) {
-      setSelectedTransaction(transaction);
-      setShowTransactionDialog(true);
-    }
-  };
+  const handleViewTransaction = async (transactionId: string) => { // Jadikan async
+  const allBookings = await getBookings(); // Tambahkan await
+  const transaction = allBookings.find(b => b.id === transactionId);
+  if (transaction) {
+    setSelectedTransaction(transaction);
+    setShowTransactionDialog(true);
+  }
+}
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1003,9 +1016,11 @@ export default function Admin() {
     }
   };
 
-  // PERFORMA: Memoisasi data yang difilter untuk mencegah perhitungan ulang di setiap render
   const pendingReports = useMemo(() => reports.filter(r => r.status === "pending"), [reports]);
-  const approvedBookingsForRevenue = useMemo(() => getBookings().filter(b => b.approvalStatus === "approved"), [bookings]);
+const approvedBookingsForRevenue = useMemo(() => 
+  allBookingsForRevenue.filter(b => b.approvalStatus === 'approved'), 
+  [allBookingsForRevenue]
+);
 
   return (
     <div className="min-h-screen bg-gradient-warm">

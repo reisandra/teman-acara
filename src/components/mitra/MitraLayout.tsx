@@ -1,5 +1,3 @@
-// src/components/mitra/MitraLayout.tsx
-
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

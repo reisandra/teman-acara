@@ -76,116 +76,124 @@ export default function Profile() {
   const notifications = userData.notifications || [];
 
   // Fungsi untuk memuat data booking
-  const loadUserBookings = useCallback(() => {
-    setIsLoadingBookings(true);
-    try {
-      // Ambil data booking dari bookingStore
-      const allBookings = getBookings();
-      const currentUser = getCurrentUser();
-      
-      console.log("Current user:", currentUser); // Debug log
-      console.log("All bookings:", allBookings); // Debug log
-      
-      // Coba beberapa kemungkinan field untuk identifikasi pengguna
-      let userBookings = [];
-      
-      // Coba dengan userId
-      userBookings = allBookings.filter(booking => booking.userId === currentUser.id);
-      console.log("Bookings filtered by userId:", userBookings.length);
-      
-      // Jika tidak ada hasil, coba dengan bookerId
-      if (userBookings.length === 0) {
-        userBookings = allBookings.filter(booking => booking.bookerId === currentUser.id);
-        console.log("Bookings filtered by bookerId:", userBookings.length);
-      }
-      
-      // Jika masih tidak ada hasil, coba dengan email
-      if (userBookings.length === 0) {
-        userBookings = allBookings.filter(booking => booking.userEmail === currentUser.email);
-        console.log("Bookings filtered by userEmail:", userBookings.length);
-      }
-      
-      // Jika masih tidak ada hasil, coba dengan kombinasi bookerId dan bookerType
-      if (userBookings.length === 0) {
-        userBookings = allBookings.filter(booking => 
-          booking.bookerId === currentUser.id && 
-          (booking.bookerType === 'user' || booking.bookerType === undefined)
-        );
-        console.log("Bookings filtered by bookerId and bookerType:", userBookings.length);
-      }
-      
-      // Log detail dari booking yang ditemukan
-      if (userBookings.length > 0) {
-        console.log("Sample booking data:", userBookings[0]);
-      }
-      
-      setBookings(userBookings);
-    } catch (error) {
-      console.error("Error loading user bookings:", error);
-      toast({
-        title: "Error",
-        description: "Gagal memuat data booking. Silakan refresh halaman.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingBookings(false);
-      setIsRefreshing(false);
+ // Fungsi untuk memuat data booking - perlu dibuat async
+const loadUserBookings = useCallback(async () => {
+  setIsLoadingBookings(true);
+  try {
+    // Ambil data booking dari bookingStore - perlu await karena sekarang mengembalikan Promise
+    const allBookings = await getBookings();
+    const currentUser = getCurrentUser();
+    
+    console.log("Current user:", currentUser); // Debug log
+    console.log("All bookings:", allBookings); // Debug log
+    
+    // Pastikan allBookings adalah array
+    if (!Array.isArray(allBookings)) {
+      console.error("getBookings() did not return an array:", allBookings);
+      setBookings([]);
+      return;
     }
-  }, [toast]);
+    
+    // Coba beberapa kemungkinan field untuk identifikasi pengguna
+    let userBookings = [];
+    
+    // Coba dengan userId
+    userBookings = allBookings.filter(booking => booking.userId === currentUser.id);
+    console.log("Bookings filtered by userId:", userBookings.length);
+    
+    // Jika tidak ada hasil, coba dengan bookerId
+    if (userBookings.length === 0) {
+      userBookings = allBookings.filter(booking => booking.bookerId === currentUser.id);
+      console.log("Bookings filtered by bookerId:", userBookings.length);
+    }
+    
+    // Jika masih tidak ada hasil, coba dengan email
+    if (userBookings.length === 0) {
+      userBookings = allBookings.filter(booking => booking.userEmail === currentUser.email);
+      console.log("Bookings filtered by userEmail:", userBookings.length);
+    }
+    
+    // Jika masih tidak ada hasil, coba dengan kombinasi bookerId dan bookerType
+    if (userBookings.length === 0) {
+      userBookings = allBookings.filter(booking => 
+        booking.bookerId === currentUser.id && 
+        (booking.bookerType === 'user' || booking.bookerType === undefined)
+      );
+      console.log("Bookings filtered by bookerId and bookerType:", userBookings.length);
+    }
+    
+    // Log detail dari booking yang ditemukan
+    if (userBookings.length > 0) {
+      console.log("Sample booking data:", userBookings[0]);
+    }
+    
+    setBookings(userBookings);
+  } catch (error) {
+    console.error("Error loading user bookings:", error);
+    toast({
+      title: "Error",
+      description: "Gagal memuat data booking. Silakan refresh halaman.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoadingBookings(false);
+    setIsRefreshing(false);
+  }
+}, [toast]);
 
-  // Fungsi untuk refresh manual
-  const handleRefreshBookings = () => {
-    setIsRefreshing(true);
-    // Hapus cache yang mungkin ada
-    localStorage.removeItem("rentmate_bookings");
-    // Tambah sedikit delay untuk visual feedback
-    setTimeout(() => {
-      loadUserBookings();
-    }, 500);
+// Fungsi untuk refresh manual - perlu dibuat async
+const handleRefreshBookings = async () => {
+  setIsRefreshing(true);
+  // Hapus cache yang mungkin ada
+  localStorage.removeItem("rentmate_bookings");
+  // Tambah sedikit delay untuk visual feedback
+  setTimeout(async () => {
+    await loadUserBookings();
+  }, 500);
+};
+
+// Load user from store on mount and subscribe
+useEffect(() => {
+  const user = getCurrentUser();
+  setUserData(user);
+  setEditData(user);
+  loadUserBookings(); // Muat data booking saat komponen dimuat
+  
+  try {
+    const stored = localStorage.getItem("rentmate_user_reviews");
+    if (stored) {
+      const arr = JSON.parse(stored) as Array<{ bookingId: string; rating: number; comment: string; talentId: string }>;
+      const map: Record<string, { rating: number; comment: string; talentId: string }> = {};
+      const ids: string[] = [];
+      arr.forEach((it) => {
+        map[it.bookingId] = { rating: it.rating, comment: it.comment, talentId: it.talentId };
+        ids.push(it.bookingId);
+      });
+      setRatedDetails(map);
+      setRatedBookings(ids);
+    }
+  } catch {}
+}, [loadUserBookings, refreshTrigger]);
+
+// Tambahkan event listener untuk update booking
+useEffect(() => {
+  const handleBookingUpdate = async () => {
+    console.log("Booking update detected in Profile, refreshing...");
+    await loadUserBookings();
   };
 
-  // Load user from store on mount and subscribe
-  useEffect(() => {
-    const user = getCurrentUser();
-    setUserData(user);
-    setEditData(user);
-    loadUserBookings(); // Muat data booking saat komponen dimuat
-    
-    try {
-      const stored = localStorage.getItem("rentmate_user_reviews");
-      if (stored) {
-        const arr = JSON.parse(stored) as Array<{ bookingId: string; rating: number; comment: string; talentId: string }>;
-        const map: Record<string, { rating: number; comment: string; talentId: string }> = {};
-        const ids: string[] = [];
-        arr.forEach((it) => {
-          map[it.bookingId] = { rating: it.rating, comment: it.comment, talentId: it.talentId };
-          ids.push(it.bookingId);
-        });
-        setRatedDetails(map);
-        setRatedBookings(ids);
-      }
-    } catch {}
-  }, [loadUserBookings, refreshTrigger]);
+  // Tambahkan event listener
+  window.addEventListener('bookingUpdated', handleBookingUpdate);
+  window.addEventListener('bookingCompleted', handleBookingUpdate);
+  window.addEventListener('bookingApproved', handleBookingUpdate);
 
-  // Tambahkan event listener untuk update booking
-  useEffect(() => {
-    const handleBookingUpdate = () => {
-      console.log("Booking update detected in Profile, refreshing...");
-      loadUserBookings();
-    };
-
-    // Tambahkan event listener
-    window.addEventListener('bookingUpdated', handleBookingUpdate);
-    window.addEventListener('bookingCompleted', handleBookingUpdate);
-    window.addEventListener('bookingApproved', handleBookingUpdate);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('bookingUpdated', handleBookingUpdate);
-      window.removeEventListener('bookingCompleted', handleBookingUpdate);
-      window.removeEventListener('bookingApproved', handleBookingUpdate);
-    };
-  }, [loadUserBookings]);
+  // Cleanup
+  return () => {
+    window.removeEventListener('bookingUpdated', handleBookingUpdate);
+    window.removeEventListener('bookingCompleted', handleBookingUpdate);
+    window.removeEventListener('bookingApproved', handleBookingUpdate);
+  };
+}, [loadUserBookings]);
 
   useEffect(() => {
     if (activeTab === "notifications" && notifications.some((n) => !n.read)) {

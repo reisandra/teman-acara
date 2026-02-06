@@ -31,8 +31,8 @@ import {
   getBookings,
   updateBooking,
   subscribeToBookings,
-  calculateMitraEarnings, // PERBAIKAN: Import fungsi baru
-  subscribeToCompletedBookings, // PERBAIKAN: Import fungsi baru
+  calculateMitraEarnings,
+  subscribeToCompletedBookings,
 } from "@/lib/bookingStore";
 import { getCurrentMitra, updateMitraProfile, subscribeToMitraChanges } from "@/lib/mitraStore";
 import {
@@ -42,7 +42,6 @@ import {
   ChatMessage,
   sendUserMessage,
 } from "@/lib/chatStore";
-import { formatPrice } from "@/lib/utils";
 
 // --- TIPE DATA ---
 type MitraRole = "talent" | "booker";
@@ -74,6 +73,29 @@ type Chat = {
   isUnread: boolean;
 };
 
+// --- HELPER FUNCTIONS ---
+
+/**
+ * PERBAIKAN: Fungsi formatPrice yang lebih robust untuk menghindari NaN
+ * dan memastikan format "Rp" selalu muncul.
+ */
+const formatPrice = (price: number | string): string => {
+  // Konversi ke number dan pastikan bukan NaN
+  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+  
+  // Jika NaN, tidak terbatas, atau tidak valid, kembalikan Rp 0
+  if (isNaN(numPrice) || !isFinite(numPrice)) {
+    return "Rp 0";
+  }
+  
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(numPrice);
+};
+
 export default function MitraDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -89,7 +111,7 @@ export default function MitraDashboard() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messageInput, setMessageInput] = useState("");
-  const [earnings, setEarnings] = useState(0); // PERBAIKAN: State khusus untuk pendapatan
+  const [earnings, setEarnings] = useState(0);
   const [stats, setStats] = useState([
     { label: "Total Chat", value: "0", icon: MessageSquare },
     { label: "Pendapatan", value: "Rp 0", icon: DollarSign },
@@ -109,31 +131,32 @@ export default function MitraDashboard() {
   // --- FUNGSI YANG DIPERBAIKI & DIOPTIMASI ---
 
   const loadBookings = useCallback(async (mode: MitraRole = "talent") => {
-  try {
-    const currentMitraData = mode === "talent" ? mitraAsTalent : mitraAsBooker;
-    if (!currentMitraData || !currentMitraData.id) {
-      console.log(`MitraDashboard: No current mitra for mode ${mode}, cannot load bookings.`);
-      setBookings([]);
-      setChats([]);
-      return;
-    }
+    try {
+      const currentMitraData = mode === "talent" ? mitraAsTalent : mitraAsBooker;
+      if (!currentMitraData || !currentMitraData.id) {
+        console.log(`MitraDashboard: No current mitra for mode ${mode}, cannot load bookings.`);
+        setBookings([]);
+        setChats([]);
+        return;
+      }
 
-    console.log(`MitraDashboard: Loading bookings for mode: ${mode}`);
-    const allBookings = await getBookings(); // <<<< TAMBAHKAN `await`
+      console.log(`MitraDashboard: Loading bookings for mode: ${mode}`);
+      // PERBAIKAN: Tambahkan `await` karena getBookings adalah async
+      const allBookings = await getBookings(); 
 
-    let mitraBookings: SharedBooking[] = [];
-    if (mode === "talent") {
-      mitraBookings = allBookings.filter(
-        (booking) => booking.talentId === currentMitraData.talentId && booking.approvalStatus === "approved"
-      );
-    } else {
-      mitraBookings = allBookings.filter(
-        (booking) => 
-          booking.bookerId === currentMitraData.talentId && 
-          booking.bookerType === "mitra" && 
-          booking.approvalStatus === "approved"
-      );
-    }
+      let mitraBookings: SharedBooking[] = [];
+      if (mode === "talent") {
+        mitraBookings = allBookings.filter(
+          (booking) => booking.talentId === currentMitraData.talentId && booking.approvalStatus === "approved"
+        );
+      } else {
+        mitraBookings = allBookings.filter(
+          (booking) => 
+            booking.bookerId === currentMitraData.talentId && 
+            booking.bookerType === "mitra" && 
+            booking.approvalStatus === "approved"
+        );
+      }
       
       const transformedChats: Chat[] = mitraBookings.map((booking) => {
         const chatSession = getChatSessionByBookingId(booking.id);
@@ -254,10 +277,19 @@ export default function MitraDashboard() {
         return;
       }
 
-      // PERBAIKAN: Gunakan fungsi baru untuk menghitung pendapatan
-      const totalRevenue = calculateMitraEarnings(currentMitraData.talentId, activeMode === "talent");
+      // PERBAIKAN: Validasi perhitungan pendapatan untuk menghindari NaN
+      let totalRevenue = 0;
+      try {
+        const revenue = await calculateMitraEarnings(currentMitraData.talentId, activeMode === "talent");
+        totalRevenue = typeof revenue === 'number' && !isNaN(revenue) ? revenue : 0;
+      } catch (error) {
+        console.error("Error calculating earnings:", error);
+        totalRevenue = 0;
+      }
+      
       setEarnings(totalRevenue);
       
+      // PERBAIKAN: Tambahkan await pada getBookings
       const allBookings = await getBookings();
       let mitraBookings: SharedBooking[] = [];
 
@@ -296,6 +328,7 @@ export default function MitraDashboard() {
       ).length;
       const responseRate = totalChats > 0 ? Math.round((respondedChats / totalChats) * 100) : 0;
 
+      // PERBAIKAN: Gunakan formatPrice yang sudah diperbaiki
       setStats([
         { label: "Total Chat", value: `${totalChats}`, icon: MessageSquare },
         { label: "Pendapatan", value: formatPrice(totalRevenue), icon: DollarSign },
@@ -304,26 +337,33 @@ export default function MitraDashboard() {
       ]);
     } catch (error) {
       console.error("Error updating stats:", error);
+      // PERBAIKAN: Fallback jika terjadi error, pastikan pendapatan tetap valid
+      setStats(prev => [
+        prev[0],
+        { label: "Pendapatan", value: "Rp 0", icon: DollarSign },
+        prev[2],
+        prev[3],
+      ]);
     }
   }, [activeMode, mitraAsTalent, mitraAsBooker]);
 
-  const handleRefresh = useCallback(async () => { // <<<< JADIKAN `async`
-  if (!isOnline) {
-    toast({ title: "Tidak Ada Koneksi", description: "Tidak dapat memperbarui data saat offline.", variant: "destructive" });
-    return;
-  }
-  setIsRefreshing(true);
-  localStorage.removeItem("rentmate_chats");
-  localStorage.removeItem("rentmate_bookings");
-  localStorage.setItem("rentmate_last_data_update", Date.now().toString());
-  
-  await loadBookings(activeMode);
-  await updateStats(); 
-  
-  setIsRefreshing(false);
-  toast({ title: "Data Diperbarui", description: "Data percakapan berhasil diperbarui" });
-}, [isOnline, toast, loadBookings, updateStats, activeMode]);
-
+  // PERBAIKAN: Jadikan fungsi async
+  const handleRefresh = useCallback(async () => { 
+    if (!isOnline) {
+      toast({ title: "Tidak Ada Koneksi", description: "Tidak dapat memperbarui data saat offline.", variant: "destructive" });
+      return;
+    }
+    setIsRefreshing(true);
+    localStorage.removeItem("rentmate_chats");
+    localStorage.removeItem("rentmate_bookings");
+    localStorage.setItem("rentmate_last_data_update", Date.now().toString());
+    
+    await loadBookings(activeMode);
+    await updateStats(); 
+    
+    setIsRefreshing(false);
+    toast({ title: "Data Diperbarui", description: "Data percakapan berhasil diperbarui" });
+  }, [isOnline, toast, loadBookings, updateStats, activeMode]);
 
   const markMessagesAsRead = useCallback((bookingId: string) => {
     console.log("MitraDashboard: Marking messages as read for booking:", bookingId);
@@ -397,19 +437,17 @@ export default function MitraDashboard() {
     };
   }, [navigate, toast, activeMode, loadBookings, updateStats]);
 
+  useEffect(() => {
+    const loadData = async () => {
+      console.log(`MitraDashboard: Active mode changed to ${activeMode}. Reloading data.`);
+      setIsLoading(true);
+      await loadBookings(activeMode);
+      await updateStats(); 
+      setIsLoading(false);
+    };
+    loadData();
+  }, [activeMode, loadBookings, updateStats]);
 
-useEffect(() => {
-  const loadData = async () => {
-    console.log(`MitraDashboard: Active mode changed to ${activeMode}. Reloading data.`);
-    setIsLoading(true);
-    await loadBookings(activeMode);
-    await updateStats(); 
-    setIsLoading(false);
-  };
-  loadData();
-}, [activeMode, loadBookings, updateStats]);
-
-  // PERBAIKAN: useEffect untuk berlangganan booking yang selesai
   useEffect(() => {
     const currentMitraData = activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
     if (!currentMitraData || !currentMitraData.id) return;
@@ -432,7 +470,6 @@ useEffect(() => {
     };
   }, [activeMode, mitraAsTalent, mitraAsBooker, updateStats, toast]);
 
-  // OPTIMASI: useEffect utama dengan interval yang lebih baik
   useEffect(() => {
     const unsubscribeBookings = subscribeToBookings(() => {
       console.log("MitraDashboard: Bookings updated, reloading...");
@@ -464,7 +501,6 @@ useEffect(() => {
     };
     window.addEventListener("bookingApproved", handleBookingApproved);
 
-    // OPTIMASI: Interval polling yang lebih cerdas
     let intervalId: NodeJS.Timeout;
     
     const handleVisibilityChange = () => {
@@ -484,7 +520,6 @@ useEffect(() => {
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Set interval awal jika tab terlihat
     if (!document.hidden) {
       intervalId = setInterval(() => {
         if (isOnline) {
@@ -533,7 +568,6 @@ useEffect(() => {
     return new Date(date).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
   };
 
-  // OPTIMASI: Menggunakan useMemo untuk daftar chat yang difilter
   const filteredChats = useMemo(() => {
     return chats.filter((chat) => 
       chat.userName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -649,7 +683,6 @@ useEffect(() => {
                 </div>
               ) : chats.length > 0 ? (
                 <div className="divide-y">
-                  {/* PERBAIKAN: Gunakan filteredChats yang sudah dioptimasi */}
                   {filteredChats.map((chat) => (
                     <div key={chat.id} className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${selectedChat?.id === chat.id ? "bg-muted/50" : ""}`} onClick={() => setSelectedChat(chat)}>
                       <div className="flex items-start gap-3">

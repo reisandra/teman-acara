@@ -6,8 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { talents } from "@/data/mockData";
-import { getBookings, SharedBooking } from "@/lib/bookingStore"; // IMPORT DARI BOOKING STORE
-import { getCurrentUser } from "@/lib/userStore"; // IMPORT UNTUK MENDAPATKAN USER LOGIN
+import { getBookings, SharedBooking, deleteBooking } from "@/lib/bookingStore"; // Tambahkan fungsi deleteBooking
+import { getCurrentUser } from "@/lib/userStore";
+import { toast } from "@/components/ui/use-toast"; // Import toast untuk notifikasi
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,23 +29,34 @@ export default function Bookings() {
 
   // Ambil data pemesanan saat komponen dimuat
   useEffect(() => {
-    const fetchBookings = () => {
+    const fetchBookings = async () => {
       setIsLoading(true);
-      const allBookings = getBookings();
-      const currentUser = getCurrentUser();
+      try {
+        const allBookings = await getBookings() || []; 
+        const currentUser = getCurrentUser();
 
-      if (currentUser) {
-        // Filter pemesanan untuk user yang sedang login
-        const userBookings = allBookings.filter(b => b.userName === currentUser.name);
-        setBookings(userBookings);
-      } else {
+        if (currentUser) {
+          const userBookings = allBookings.filter(b => b.userName === currentUser.name);
+          setBookings(userBookings);
+        } else {
+          setBookings([]);
+        }
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
         setBookings([]);
+        // Tambahkan notifikasi error
+        toast({
+          title: "Error",
+          description: "Gagal memuat data pemesanan. Silakan coba lagi.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchBookings();
-  }, []);
+  }, []); // Hanya ada satu useEffect dengan dependencies kosong
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -58,7 +70,7 @@ export default function Bookings() {
   const getBookingStatus = (booking: SharedBooking): BookingStatus => {
     // Jika status sudah ditolak atau dibatalkan, kembalikan status itu
     if (booking.approvalStatus === "rejected") return "cancelled";
-    if (booking.approvalStatus === "cancelled") return "cancelled"; // Asumsi ada status cancelled
+    if (booking.approvalStatus === "cancelled") return "cancelled";
 
     // Jika statusnya masih menunggu pembayaran atau persetujuan, kembalikan status itu
     if (booking.approvalStatus === "pending_approval") return "pending_approval";
@@ -66,15 +78,14 @@ export default function Bookings() {
 
     // Jika statusnya disetujui, kita perlu cek apakah waktunya sudah lewat
     if (booking.approvalStatus === "approved") {
+      // Idealnya, gunakan waktu dari server, bukan client
       const now = new Date();
       const startTime = new Date(`${booking.date}T${booking.time}`);
       const endTime = new Date(startTime.getTime() + booking.duration * 60 * 60 * 1000);
 
       if (endTime < now) {
-        // Jika waktu sekarang melewati waktu selesai, statusnya adalah "completed"
         return "completed";
       } else {
-        // Jika belum, statusnya adalah "approved" (aktif)
         return "approved";
       }
     }
@@ -101,18 +112,28 @@ export default function Bookings() {
   };
 
   // Fungsi untuk menghapus pemesanan
-  const handleDeleteBooking = (bookingId: string) => {
-    // Dapatkan semua pemesanan yang ada
-    const allBookings = getBookings();
-    
-    // Filter pemesanan yang akan dihapus
-    const updatedBookings = allBookings.filter(booking => booking.id !== bookingId);
-    
-    // Simpan kembali ke localStorage
-    localStorage.setItem("rentmate_bookings", JSON.stringify(updatedBookings));
-    
-    // Update state lokal
-    setBookings(prevBookings => prevBookings.filter(booking => booking.id !== bookingId));
+  const handleDeleteBooking = async (bookingId: string) => {
+    try {
+      // Gunakan fungsi dari bookingStore untuk konsistensi
+      await deleteBooking(bookingId);
+      
+      // Update state lokal
+      setBookings(prevBookings => prevBookings.filter(booking => booking.id !== bookingId));
+      
+      // Tambahkan notifikasi sukses
+      toast({
+        title: "Berhasil",
+        description: "Pemesanan berhasil dihapus.",
+      });
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      // Tambahkan notifikasi error
+      toast({
+        title: "Error",
+        description: "Gagal menghapus pemesanan. Silakan coba lagi.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Filter pemesanan berdasarkan status yang sudah dihitung ulang

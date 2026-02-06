@@ -8,13 +8,13 @@ export type MessageStatus = "sent" | "delivered" | "read";
 export interface ChatMessage {
   id: string;
   senderId: string;
-  senderType: "user" | "talent" | "mitra-as-booker"; // PERBAIKAN: Tambahkan tipe "mitra-as-booker"
+  senderType: "user" | "talent" | "mitra-as-booker";
   message: string;
   timestamp: string;
   status: MessageStatus;
   readByUser: boolean;
   readByMitra: boolean;
-  readByMitraAsBooker?: boolean; // PERBAIKAN: Tambahkan flag read untuk mitra sebagai booker
+  readByMitraAsBooker?: boolean;
   readAt?: string;
   isAutoResponse?: boolean;
 }
@@ -36,13 +36,13 @@ export interface ChatSession {
   messages: ChatMessage[];
   isTalentTyping?: boolean;
   isUserTyping?: boolean;
-  isMitraAsBookerTyping?: boolean; // PERBAIKAN: Tambahkan flag typing untuk mitra sebagai booker
+  isMitraAsBookerTyping?: boolean;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
-  unreadCountForUser?: number; // PERBAIKAN: Tambahkan unread count untuk user
-  unreadCountForMitra?: number; // PERBAIKAN: Tambahkan unread count untuk mitra
-  unreadCountForMitraAsBooker?: number; // PERBAIKAN: Tambahkan unread count untuk mitra sebagai booker
+  unreadCountForUser?: number;
+  unreadCountForMitra?: number;
+  unreadCountForMitraAsBooker?: number;
 }
 
 /* ================= STORAGE ================= */
@@ -58,14 +58,14 @@ export function getChatSessions(): ChatSession[] {
         ...s,
         isTalentTyping: s.isTalentTyping ?? false,
         isUserTyping: s.isUserTyping ?? false,
-        isMitraAsBookerTyping: s.isMitraAsBookerTyping ?? false, // PERBAIKAN: Tambahkan default value
+        isMitraAsBookerTyping: s.isMitraAsBookerTyping ?? false,
         messages: s.messages.map(m => ({ 
           ...m, 
           status: m.status ?? 'sent',
-          readByMitraAsBooker: m.readByMitraAsBooker ?? false, // PERBAIKAN: Tambahkan default value
-          unreadCountForUser: s.unreadCountForUser ?? 0, // PERBAIKAN: Tambahkan default value
-          unreadCountForMitra: s.unreadCountForMitra ?? 0, // PERBAIKAN: Tambahkan default value
-          unreadCountForMitraAsBooker: s.unreadCountForMitraAsBooker ?? 0, // PERBAIKAN: Tambahkan default value
+          readByMitraAsBooker: m.readByMitraAsBooker ?? false,
+          unreadCountForUser: s.unreadCountForUser ?? 0,
+          unreadCountForMitra: s.unreadCountForMitra ?? 0,
+          unreadCountForMitraAsBooker: s.unreadCountForMitraAsBooker ?? 0,
         }))
     }));
   } catch { return []; }
@@ -76,7 +76,6 @@ function saveChatSessions(sessions: ChatSession[]) {
   localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sessions));
 
   window.dispatchEvent(new CustomEvent("chatsUpdated"));
-  // PERBAIKAN: Tambahkan event khusus untuk update mitra sebagai booker
   window.dispatchEvent(new CustomEvent("mitraAsBookerChatsUpdated"));
 }
 
@@ -125,15 +124,15 @@ export function getOrCreateChatSession(booking: SharedBooking): ChatSession | nu
         status: "delivered", 
         readByUser: false, 
         readByMitra: true,
-        readByMitraAsBooker: true, // PERBAIKAN: Tandai sebagai sudah dibaca oleh mitra sebagai booker
+        readByMitraAsBooker: true,
         isAutoResponse: true 
       }],
       lastMessage: welcomeMessage,
       lastMessageTime: new Date().toISOString(),
       unreadCount: 1,
-      unreadCountForUser: 1, // PERBAIKAN: Tambahkan unread count untuk user
-      unreadCountForMitra: 0, // PERBAIKAN: Tambahkan unread count untuk mitra
-      unreadCountForMitraAsBooker: 0, // PERBAIKAN: Tambahkan unread count untuk mitra sebagai booker
+      unreadCountForUser: 1,
+      unreadCountForMitra: 0,
+      unreadCountForMitraAsBooker: 0,
       isTalentTyping: false,
       isUserTyping: false,
       isMitraAsBookerTyping: false,
@@ -153,18 +152,24 @@ export function getChatSessionsForTalent(talentId: string): ChatSession[] {
   return getChatSessions().filter(session => session.talentId === talentId);
 }
 
-// PERBAIKAN: Tambahkan fungsi untuk mendapatkan chat sessions untuk mitra sebagai booker
-export function getChatSessionsForMitraAsBooker(mitraId: string): ChatSession[] {
-  if (!mitraId) return [];
-  return getChatSessions().filter(session => {
-    // Cari booking di mana mitra ini adalah booker
-    const booking = getBookings().find(b => 
-      b.bookerId === mitraId && 
-      b.bookerType === "mitra" && 
-      b.talentId === session.talentId
-    );
-    return booking !== undefined;
-  });
+export async function getChatSessionsForMitraAsBooker(mitraId: string): Promise<ChatSession[]> {
+  try {
+    if (!mitraId) return [];
+    const bookings = await getBookings() || [];
+    const sessions = getChatSessions();
+    
+    return sessions.filter(session => {
+      const booking = bookings.find(b => 
+        b.bookerId === mitraId && 
+        b.bookerType === "mitra" && 
+        b.talentId === session.talentId
+      );
+      return booking !== undefined;
+    });
+  } catch (error) {
+    console.error("Error getting chat sessions for mitra as booker:", error);
+    return [];
+  }
 }
 
 /* ================= KIRIM PESAN ================= */
@@ -176,7 +181,6 @@ export function sendMitraMessage(bookingId: string, message: string) {
   const session = sessions[idx];
   const messages = session.messages;
 
-  // PERBAIKAN: Cari pesan TERAKHIR dari user yang belum dibaca dan tandai sebagai 'read'
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].senderType === "user" && messages[i].status !== "read") {
       messages[i].status = "read";
@@ -196,15 +200,15 @@ export function sendMitraMessage(bookingId: string, message: string) {
     status: "sent",
     readByUser: false, 
     readByMitra: true,
-    readByMitraAsBooker: true // PERBAIKAN: Tandai sebagai sudah dibaca oleh mitra sebagai booker
+    readByMitraAsBooker: true
   };
   messages.push(newMsg);
   session.lastMessage = message;
   session.lastMessageTime = newMsg.timestamp;
   session.unreadCount = 0;
-  session.unreadCountForUser = 0; // PERBAIKAN: Reset unread count untuk user
-  session.unreadCountForMitra = 0; // PERBAIKAN: Reset unread count untuk mitra
-  session.unreadCountForMitraAsBooker = 0; // PERBAIKAN: Reset unread count untuk mitra sebagai booker
+  session.unreadCountForUser = 0;
+  session.unreadCountForMitra = 0;
+  session.unreadCountForMitraAsBooker = 0;
   
   saveChatSessions(sessions);
   return newMsg;
@@ -218,7 +222,6 @@ export function sendUserMessage(userId: string, message: string, bookingId: stri
   const session = sessions[idx];
   const messages = session.messages;
 
-  // PERBAIKAN: Tentukan penerima berdasarkan tipe pengirim
   let receiverType: "talent" | "user" | "mitra-as-booker" = "talent";
   if (senderType === "mitra-as-booker") {
     receiverType = "talent";
@@ -226,7 +229,6 @@ export function sendUserMessage(userId: string, message: string, bookingId: stri
     receiverType = "user";
   }
 
-  // PERBAIKAN: Cari pesan TERAKHIR dari penerima yang belum dibaca dan tandai sebagai 'read'
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].senderType === receiverType && messages[i].status !== "read") {
       messages[i].status = "read";
@@ -252,15 +254,14 @@ export function sendUserMessage(userId: string, message: string, bookingId: stri
     message, 
     timestamp: new Date().toISOString(), 
     status: "sent",
-    readByUser: senderType === "user", // PERBAIKAN: Tandai sebagai sudah dibaca jika pengirim adalah user
+    readByUser: senderType === "user",
     readByMitra: false,
-    readByMitraAsBooker: senderType === "mitra-as-booker" // PERBAIKAN: Tandai sebagai sudah dibaca jika pengirim adalah mitra sebagai booker
+    readByMitraAsBooker: senderType === "mitra-as-booker"
   };
   messages.push(newMsg);
   session.lastMessage = message;
   session.lastMessageTime = newMsg.timestamp;
   
-  // PERBAIKAN: Update unread count berdasarkan penerima
   if (receiverType === "user") {
     session.unreadCountForUser += 1;
   } else if (receiverType === "talent") {
@@ -269,12 +270,10 @@ export function sendUserMessage(userId: string, message: string, bookingId: stri
     session.unreadCountForMitraAsBooker += 1;
   }
   
-  // PERBAIKAN: Update total unread count
   session.unreadCount = session.unreadCountForUser + session.unreadCountForMitra + session.unreadCountForMitraAsBooker;
   
   saveChatSessions(sessions);
   
-  // PERBAIKAN: Trigger event yang sesuai
   if (senderType === "mitra-as-booker") {
     window.dispatchEvent(new CustomEvent("mitraAsBookerMessageAdded", { 
       detail: { 
@@ -287,7 +286,6 @@ export function sendUserMessage(userId: string, message: string, bookingId: stri
   return newMsg;
 }
 
-// PERBAIKAN: Tambahkan fungsi khusus untuk mengirim pesan dari mitra sebagai booker
 export function sendMitraAsBookerMessage(mitraId: string, message: string, bookingId: string): ChatMessage | null {
   return sendUserMessage(mitraId, message, bookingId, "mitra-as-booker");
 }
@@ -315,7 +313,7 @@ export function markMessagesAsReadByMitra(bookingId: string) {
   });
 
   if (hasUpdates) { 
-    sessions[idx].unreadCountForMitra = 0; // PERBAIKAN: Reset unread count untuk mitra
+    sessions[idx].unreadCountForMitra = 0;
     sessions[idx].unreadCount = sessions[idx].unreadCountForUser + sessions[idx].unreadCountForMitra + sessions[idx].unreadCountForMitraAsBooker;
     saveChatSessions(sessions); 
   }
@@ -343,13 +341,12 @@ export function markMessagesAsReadByUser(bookingId: string) {
   });
 
   if (hasUpdates) { 
-    sessions[idx].unreadCountForUser = 0; // PERBAIKAN: Reset unread count untuk user
+    sessions[idx].unreadCountForUser = 0;
     sessions[idx].unreadCount = sessions[idx].unreadCountForUser + sessions[idx].unreadCountForMitra + sessions[idx].unreadCountForMitraAsBooker;
     saveChatSessions(sessions); 
   }
 }
 
-// PERBAIKAN: Tambahkan fungsi untuk menandai pesan sebagai dibaca oleh mitra sebagai booker
 export function markMessagesAsReadByMitraAsBooker(bookingId: string) {
   console.log(`[chatStore] markMessagesAsReadByMitraAsBooker dipanggil untuk bookingId: ${bookingId}`);
   const sessions = getChatSessions();
@@ -372,13 +369,12 @@ export function markMessagesAsReadByMitraAsBooker(bookingId: string) {
   });
 
   if (hasUpdates) { 
-    sessions[idx].unreadCountForMitraAsBooker = 0; // PERBAIKAN: Reset unread count untuk mitra sebagai booker
+    sessions[idx].unreadCountForMitraAsBooker = 0;
     sessions[idx].unreadCount = sessions[idx].unreadCountForUser + sessions[idx].unreadCountForMitra + sessions[idx].unreadCountForMitraAsBooker;
     saveChatSessions(sessions); 
   }
 }
 
-// PERBAIKAN: Tambahkan fungsi untuk menandai pesan sebagai dibaca oleh talent
 export function markMessagesAsReadByTalent(bookingId: string) {
   console.log(`[chatStore] markMessagesAsReadByTalent dipanggil untuk bookingId: ${bookingId}`);
   const sessions = getChatSessions();
@@ -401,14 +397,13 @@ export function markMessagesAsReadByTalent(bookingId: string) {
   });
 
   if (hasUpdates) { 
-    sessions[idx].unreadCountForUser = 0; // PERBAIKAN: Reset unread count untuk user
-    sessions[idx].unreadCountForMitraAsBooker = 0; // PERBAIKAN: Reset unread count untuk mitra sebagai booker
+    sessions[idx].unreadCountForUser = 0;
+    sessions[idx].unreadCountForMitraAsBooker = 0;
     sessions[idx].unreadCount = sessions[idx].unreadCountForUser + sessions[idx].unreadCountForMitra + sessions[idx].unreadCountForMitraAsBooker;
     saveChatSessions(sessions); 
   }
 }
 
-// ✅ TAMBAHKAN FUNGSI INI UNTUK MENANDAI PESAN SEBAGAI DELIVERED
 export function markMessagesAsDelivered(bookingId: string, senderType: "user" | "talent" | "mitra-as-booker") {
   console.log(`[chatStore] markMessagesAsDelivered dipanggil untuk bookingId: ${bookingId}, senderType: ${senderType}`);
   const sessions = getChatSessions();
@@ -416,7 +411,6 @@ export function markMessagesAsDelivered(bookingId: string, senderType: "user" | 
   if (idx === -1) return;
 
   let hasUpdates = false;
-  // PERBAIKAN: Tentukan penerima berdasarkan tipe pengirim
   let receiverType: "talent" | "user" | "mitra-as-booker" = "user";
   if (senderType === "user") {
     receiverType = "talent";
@@ -459,7 +453,6 @@ export function setTalentTyping(bookingId: string, isTyping: boolean) {
   saveChatSessions(sessions);
 }
 
-// PERBAIKAN: Tambahkan fungsi untuk menangani typing mitra sebagai booker
 export function setMitraAsBookerTyping(bookingId: string, isTyping: boolean) {
   const sessions = getChatSessions();
   const idx = sessions.findIndex(s => s.bookingId === bookingId);
@@ -469,45 +462,74 @@ export function setMitraAsBookerTyping(bookingId: string, isTyping: boolean) {
 }
 
 /* ================= SUBSCRIBE REAL-TIME ================= */
-export function subscribeToChats(callback: () => void) {
-  window.addEventListener("chatsUpdated", callback);
-  return () => window.removeEventListener("chatsUpdated", callback);
+export function subscribeToChats(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  
+  const handleChatsUpdate = async () => {
+    try {
+      await callback();
+    } catch (error) {
+      console.error("Error in chats update callback:", error);
+    }
+  };
+  
+  window.addEventListener("chatsUpdated", handleChatsUpdate);
+  return () => window.removeEventListener("chatsUpdated", handleChatsUpdate);
 }
 
-// PERBAIKAN: Tambahkan fungsi subscribe khusus untuk mitra sebagai booker
-export function subscribeToMitraAsBookerChats(callback: () => void) {
-  window.addEventListener("mitraAsBookerChatsUpdated", callback);
-  return () => window.removeEventListener("mitraAsBookerChatsUpdated", callback);
+export function subscribeToMitraAsBookerChats(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  
+  const handleMitraChatsUpdate = async () => {
+    try {
+      await callback();
+    } catch (error) {
+      console.error("Error in mitra chats update callback:", error);
+    }
+  };
+  
+  window.addEventListener("mitraAsBookerChatsUpdated", handleMitraChatsUpdate);
+  return () => window.removeEventListener("mitraAsBookerChatsUpdated", handleMitraChatsUpdate);
 }
 
 /* ================= FUNGSI YANG DIBUTUHKAN OLEH ChatList.tsx ================= */
-
-export function getActiveChatSessions(): ChatSession[] {
-  // Pastikan fungsi getBookings dan getOrCreateChatSession sudah ada di file ini
-  const approved = getBookings().filter(b => b.approvalStatus === "approved");
-  approved.forEach(getOrCreateChatSession);
-  return getChatSessions().sort(
-    (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-  );
+export async function getActiveChatSessions(): Promise<ChatSession[]> {
+  try {
+    const bookings = await getBookings() || [];
+    const approved = bookings.filter(b => b.approvalStatus === "approved");
+    
+    approved.forEach(getOrCreateChatSession);
+    return getChatSessions().sort(
+      (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+    );
+  } catch (error) {
+    console.error("Error getting active chat sessions:", error);
+    return [];
+  }
 }
 
-// ================= FUNGSI YANG DIBUTUHKAN OLEH MitraDashboard.tsx =================
-
+/* ================= FUNGSI YANG DIBUTUHKAN OLEH MitraDashboard.tsx ================= */
 export function getChatSessionsByMitraId(mitraId: string): ChatSession[] {
   if (!mitraId) return [];
   return getChatSessions().filter(session => session.talentId === mitraId);
 }
 
-// PERBAIKAN: Tambahkan fungsi untuk mendapatkan chat sessions di mana mitra adalah booker
-export function getChatSessionsWhereMitraIsBooker(mitraId: string): ChatSession[] {
-  if (!mitraId) return [];
-  return getChatSessions().filter(session => {
-    // Cari booking di mana mitra ini adalah booker
-    const booking = getBookings().find(b => 
-      b.bookerId === mitraId && 
-      b.bookerType === "mitra" && 
-      b.talentId === session.talentId
-    );
-    return booking !== undefined;
-  });
+export async function getChatSessionsWhereMitraIsBooker(mitraId: string): Promise<ChatSession[]> {
+  try {
+    if (!mitraId) return [];
+    const bookings = await getBookings() || [];
+    const sessions = getChatSessions();
+    
+    return sessions.filter(session => {
+      const booking = bookings.find(b => 
+        b.bookerId === mitraId && 
+        b.bookerType === "mitra" && 
+        b.talentId === session.talentId
+      );
+      return booking !== undefined;
+    });
+  } catch (error) {
+    console.error("Error getting chat sessions where mitra is booker:", error);
+    return [];
+  }
 }

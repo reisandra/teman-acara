@@ -10,12 +10,19 @@ import { subscribeToBookings } from "@/lib/bookingStore";
 export default function ChatList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load chat sessions from approved bookings
-  useEffect(() => {
-    const loadChats = () => {
-      const sessions = getActiveChatSessions();
-      setChatSessions(sessions);
+ useEffect(() => {
+    const loadChats = async () => {
+      try {
+        setIsLoading(true);
+        const sessions = await getActiveChatSessions();
+        setChatSessions(sessions);
+      } catch (error) {
+        console.error("Error loading chats:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadChats();
@@ -28,7 +35,7 @@ export default function ChatList() {
       unsubscribeChats();
       unsubscribeBookings();
     };
-  }, []);
+  }, [])
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);

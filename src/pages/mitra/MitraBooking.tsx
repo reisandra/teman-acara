@@ -1,4 +1,5 @@
 // src/pages/mitra/MitraBooking.tsx
+
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -34,11 +35,10 @@ import {
   SharedBooking,
   updateBookingRating,
   getCurrentUserOrMitra,
-  updateBooking, // PERBAIKAN: Tambahkan import ini
+  updateBooking,
 } from "@/lib/bookingStore";
 import { getCurrentUser } from "@/lib/userStore";
 import { createBooking } from "@/lib/bookings";
-import { isTimeSlotBooked } from "@/lib/bookingStore";
 import { getAllVerifiedTalents } from "@/lib/mitraStore";
 
 type BookingStatus = "draft" | "pending_payment" | "pending_approval" | "approved" | "completed" | "rejected";
@@ -216,7 +216,7 @@ const TimeSlotButton = memo(({
   isSelected, 
   isBooked, 
   isOutsideWorkingHours, 
-  onClick 
+  onClick
 }: {
   time: string;
   isSelected: boolean;
@@ -386,6 +386,10 @@ export default function MitraBooking() {
 
   // Track if we're in the middle of creating a new booking
   const [isCreatingNewBooking, setIsCreatingNewBooking] = useState(false);
+  
+  // PERBAIKAN: State untuk menyimpan booking yang sudah disetujui di tanggal tertentu
+  const [approvedBookingsForDate, setApprovedBookingsForDate] = useState<SharedBooking[]>([]);
+  const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
   // Load payment settings
   useEffect(() => {
@@ -434,6 +438,53 @@ export default function MitraBooking() {
     loadTalents();
   }, [id, navigate]);
 
+  // PERBAIKAN: useEffect untuk mengambil booking yang disetujui di satu tanggal
+  useEffect(() => {
+    const fetchApprovedBookings = async () => {
+      if (!id || !bookingData.date) {
+        setApprovedBookingsForDate([]);
+        return;
+      }
+
+      setIsLoadingBookedSlots(true);
+      try {
+        const allBookings = await getBookings();
+        const filtered = allBookings.filter(b => 
+          b.talentId === id && 
+          b.date === bookingData.date && 
+          b.approvalStatus === 'approved'
+        );
+        setApprovedBookingsForDate(filtered);
+      } catch (error) {
+        console.error("Error fetching approved bookings:", error);
+        setApprovedBookingsForDate([]);
+      } finally {
+        setIsLoadingBookedSlots(false);
+      }
+    };
+
+    fetchApprovedBookings();
+  }, [id, bookingData.date]); // Hanya bergantung pada id dan tanggal
+
+  // PERBAIKAN: Fungsi helper untuk mengecek overlap, dijalankan di client-side
+  const isTimeSlotBookedClientSide = (time: string) => {
+    if (!approvedBookingsForDate.length || !bookingData.date) return false;
+
+    const newStartTime = new Date(`${bookingData.date}T${time}`);
+    const newEndTime = new Date(newStartTime.getTime() + bookingData.duration * 60 * 60 * 1000);
+    
+    return approvedBookingsForDate.some(booking => {
+      const bookingStartTime = new Date(`${booking.date}T${booking.time}`);
+      const bookingEndTime = new Date(bookingStartTime.getTime() + booking.duration * 60 * 60 * 1000);
+      
+      return (
+        (newStartTime >= bookingStartTime && newStartTime < bookingEndTime) ||
+        (newEndTime > bookingStartTime && newEndTime <= bookingEndTime) ||
+        (newStartTime <= bookingStartTime && newEndTime >= bookingEndTime)
+      );
+    });
+  };
+
   // Memoized functions
   const getPaymentCodeStorageKey = useCallback((userId: string, talentId: string, date: string, time: string) => {
     return `rentmate_payment_code_${userId}_${talentId}_${date}_${time}`;
@@ -462,95 +513,100 @@ export default function MitraBooking() {
   useEffect(() => {
     if (!id || isInitialLoading) return;
 
-    const currentUser = getCurrentUserOrMitra();
-    if (!currentUser) {
-      navigate("/mitra/login");
-      return;
-    }
-
-    // Don't reset if we're in the middle of creating a new booking
-    if (isCreatingNewBooking) return;
-
-    const allBookings = getBookings();
-    const now = new Date();
-
-    const existingBooking = allBookings.find((b) => {
-      if (b.bookerId !== currentUser.data.id || b.talentId !== id || b.approvalStatus === "rejected") {
-        return false;
+    const checkExistingBooking = async () => {
+      const currentUser = getCurrentUserOrMitra();
+      if (!currentUser) {
+        navigate("/mitra/login");
+        return;
       }
 
-      const startTime = new Date(`${b.date}T${b.time}`);
-      const endTime = new Date(startTime.getTime() + b.duration * 60 * 60 * 1000);
+      // Don't reset if we're in the middle of creating a new booking
+      if (isCreatingNewBooking) return;
 
-      return endTime > now;
-    });
+      // Perbaikan: Tunggu Promise selesai dengan await
+      const allBookings = await getBookings();
+      const now = new Date();
 
-    if (!existingBooking) {
-      setCurrentBookingId(null);
-      setBookingStatus("draft");
-      // Only reset step to 1 if we're not already on a higher step
-      // This prevents resetting when user is actively filling the form
-      if (step === 1) {
-        setStep(1);
+      const existingBooking = allBookings.find((b) => {
+        if (b.bookerId !== currentUser.data.id || b.talentId !== id || b.approvalStatus === "rejected") {
+          return false;
+        }
+
+        const startTime = new Date(`${b.date}T${b.time}`);
+        const endTime = new Date(startTime.getTime() + b.duration * 60 * 60 * 1000);
+
+        return endTime > now;
+      });
+
+      if (!existingBooking) {
+        setCurrentBookingId(null);
+        setBookingStatus("draft");
+        // Only reset step to 1 if we're not already on a higher step
+        // This prevents resetting when user is actively filling the form
+        if (step === 1) {
+          setStep(1);
+        }
+
+        const potentialCode = getOrCreateStablePaymentCode();
+        setPaymentCode(potentialCode || "");
+        return;
       }
 
-      const potentialCode = getOrCreateStablePaymentCode();
-      setPaymentCode(potentialCode || "");
-      return;
-    }
+      setCurrentBooking(existingBooking);
+      setCurrentBookingId(existingBooking.id);
+      
+      // Check if purpose is a custom one
+      if (existingBooking.purpose.startsWith("Lainnya:")) {
+        const customText = existingBooking.purpose.replace("Lainnya:", "").trim();
+        setCustomPurpose(customText);
+      }
+      
+      // PERBAIKAN: Ambil pesan untuk admin dari notes
+      const adminMsg = existingBooking.adminMessage || "";
+      setAdminMessage(adminMsg);
+      
+      setBookingData({
+        duration: existingBooking.duration,
+        purpose: existingBooking.purpose,
+        type: existingBooking.type,
+        date: existingBooking.date,
+        time: existingBooking.time,
+        notes: existingBooking.notes || "",
+      });
 
-    setCurrentBooking(existingBooking);
-    setCurrentBookingId(existingBooking.id);
-    
-    // Check if purpose is a custom one
-    if (existingBooking.purpose.startsWith("Lainnya:")) {
-      const customText = existingBooking.purpose.replace("Lainnya:", "").trim();
-      setCustomPurpose(customText);
-    }
-    
-    // PERBAIKAN: Ambil pesan untuk admin dari notes
-    const adminMsg = existingBooking.adminMessage || "";
-    setAdminMessage(adminMsg);
-    
-    setBookingData({
-      duration: existingBooking.duration,
-      purpose: existingBooking.purpose,
-      type: existingBooking.type,
-      date: existingBooking.date,
-      time: existingBooking.time,
-      notes: existingBooking.notes || "",
-    });
+      setPaymentCode(existingBooking.paymentCode || getOrCreateStablePaymentCode());
 
-    setPaymentCode(existingBooking.paymentCode || getOrCreateStablePaymentCode());
+      if (existingBooking.paymentStatus === "pending" && !existingBooking.paymentProof) {
+        setBookingStatus("pending_payment");
+        setStep(3);
+        return;
+      }
 
-    if (existingBooking.paymentStatus === "pending" && !existingBooking.paymentProof) {
-      setBookingStatus("pending_payment");
-      setStep(3);
-      return;
-    }
+      if (existingBooking.approvalStatus === "pending_approval") {
+        setBookingStatus("pending_approval");
+        setStep(4);
+        return;
+      }
 
-    if (existingBooking.approvalStatus === "pending_approval") {
-      setBookingStatus("pending_approval");
-      setStep(4);
-      return;
-    }
-
-    if (existingBooking.approvalStatus === "approved") {
-      setBookingStatus("approved");
-      setStep(5);
-      return;
-    }
-
-    if (existingBooking.date && existingBooking.time && existingBooking.duration) {
-      const startTime = new Date(`${existingBooking.date}T${existingBooking.time}`);
-      const endTime = new Date(startTime.getTime() + existingBooking.duration * 60 * 60 * 1000);
-
-      if (endTime < now && existingBooking.approvalStatus === "approved") {
-        setBookingStatus("completed");
+      if (existingBooking.approvalStatus === "approved") {
+        setBookingStatus("approved");
         setStep(5);
         return;
       }
-    }
+
+      if (existingBooking.date && existingBooking.time && existingBooking.duration) {
+        const startTime = new Date(`${existingBooking.date}T${existingBooking.time}`);
+        const endTime = new Date(startTime.getTime() + existingBooking.duration * 60 * 60 * 1000);
+
+        if (endTime < now && existingBooking.approvalStatus === "approved") {
+          setBookingStatus("completed");
+          setStep(5);
+          return;
+        }
+      }
+    };
+
+    checkExistingBooking();
   }, [id, navigate, isInitialLoading, getOrCreateStablePaymentCode, step, isCreatingNewBooking]);
 
   // Subscribe to booking updates
@@ -643,7 +699,7 @@ export default function MitraBooking() {
     setStep(step - 1);
   }, [bookingStatus, step]);
 
-  const handlePayment = useCallback(() => {
+  const handlePayment = useCallback(async () => {
     const currentUser = getCurrentUserOrMitra();
 
     if (!currentUser) {
@@ -678,7 +734,8 @@ export default function MitraBooking() {
       ? `Lainnya: ${customPurpose}` 
       : bookingData.purpose;
 
-    const booking = addBooking({
+    // PERBAIKAN: Pastikan addBooking juga menangani Promise dengan benar
+    const booking = await addBooking({
       ...bookerData,
       talentId: talentForDisplay.id,
       talentName: talentForDisplay.name,
@@ -693,7 +750,6 @@ export default function MitraBooking() {
       paymentStatus: "pending",
       approvalStatus: "pending_approval",
       paymentCode: newPaymentCode,
-      // PERBAIKAN: Tambahkan field adminMessage
       adminMessage: adminMessage,
     });
 
@@ -910,17 +966,14 @@ export default function MitraBooking() {
     ));
   }, [bookingData.purpose]);
 
+  // PERBAIKAN: Perbarui timeSlotButtons untuk menggunakan pendekatan client-side
   const timeSlotButtons = useMemo(() => {
     if (!bookingData.date) return null;
 
     return TIME_SLOTS.map((time) => {
-      const isBooked = isTimeSlotBooked(
-        id!,
-        bookingData.date,
-        time,
-        bookingData.duration,
-      );
-
+      // PERBAIKAN: Gunakan fungsi client-side untuk mengecek ketersediaan
+      const isBooked = isTimeSlotBookedClientSide(time);
+      
       const [hour] = time.split(":").map(Number);
       const isOutsideWorkingHours = hour < 8 || hour >= 22;
 
@@ -935,7 +988,7 @@ export default function MitraBooking() {
         />
       );
     });
-  }, [bookingData.date, bookingData.time, bookingData.duration, id]);
+  }, [bookingData.date, bookingData.time, approvedBookingsForDate, bookingData.duration]);
 
   const paymentMethodCards = useMemo(() => {
     const methods = [
@@ -1200,6 +1253,11 @@ export default function MitraBooking() {
                       {!bookingData.date ? (
                         <div className="h-10 rounded-xl border-2 border-dashed flex items-center justify-center text-xs text-muted-foreground">
                           Pilih tanggal terlebih dahulu
+                        </div>
+                      ) : isLoadingBookedSlots ? (
+                        <div className="h-48 rounded-xl border-2 border-dashed flex items-center justify-center text-xs text-muted-foreground">
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Memeriksa ketersediaan jam...
                         </div>
                       ) : (
                         <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-2 border rounded-xl">

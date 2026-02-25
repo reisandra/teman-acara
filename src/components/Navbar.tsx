@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Home, Users, Calendar, MessageCircle, User, Menu, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Users, Calendar, MessageCircle, User, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getCurrentUser, subscribeToUser, UserProfile } from "@/lib/userStore";
 import { dicebearAvatar } from "@/lib/utils";
-import { useAppSettings } from "@/contexts/AppSettingsContext"; // Pastikan ini benar
+import { useAppSettings } from "@/contexts/AppSettingsContext"; 
+import { logoutUser } from "@/lib/userStore";
+import { useToast } from "@/hooks/use-toast";
 
 // User navigation items - NO admin access
 const userNavItems = [
@@ -20,7 +22,18 @@ export function Navbar() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const { settings } = useAppSettings(); // Gunakan context untuk mendapatkan pengaturan
+  const { settings } = useAppSettings();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    logoutUser();
+    toast({
+      title: "Logout Berhasil 👋",
+      description: "Anda telah keluar dari akun",
+    });
+    navigate("/login");
+  };
 
   useEffect(() => {
     setUser(getCurrentUser());
@@ -30,7 +43,7 @@ export function Navbar() {
     return unsubscribe;
   }, []);
 
-  // Hide navbar on admin pages - admin has its own header
+  // Hide navbar on admin pages
   if (location.pathname === "/admin" || location.pathname === "/admin-login") {
     return null;
   }
@@ -57,49 +70,54 @@ export function Navbar() {
               const isActive = location.pathname === item.path;
               const isProfile = item.label === "Profil";
               const unread = isProfile ? (user?.notifications?.filter((n) => !n.read).length || 0) : 0;
-              
+
               return (
-                <Link key={item.path} to={item.path}>
-                  <Button
-                    variant={isActive ? "soft" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "gap-2",
-                      isActive && "text-primary font-semibold"
-                    )}
-                  >
-                    {isProfile && user ? (
-                      <img 
-                        src={user.photo} 
-                        alt="Profile" 
-                        className="w-5 h-5 rounded-full object-cover ring-1 ring-primary/20"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = dicebearAvatar(user.name, "Wanita", 64);
-                        }}
-                      />
-                    ) : (
-                      <Icon className="w-4 h-4" />
-                    )}
-                    {item.label}
-                    {isProfile && unread > 0 && (
-                      <span className="ml-1 inline-flex items-center justify-center text-[10px] min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white">
-                        {unread}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
+                <div key={item.path} className="relative">
+                  <Link to={item.path}>
+                    <Button
+                      variant={isActive ? "soft" : "ghost"}
+                      size="sm"
+                      className={cn("gap-2", isActive && "text-primary font-semibold")}
+                    >
+                      {isProfile && user ? (
+                        <img
+                          src={user.photo}
+                          alt="Profile"
+                          className="w-5 h-5 rounded-full object-cover ring-1 ring-primary/20"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = dicebearAvatar(user.name, "Wanita", 64);
+                          }}
+                        />
+                      ) : (
+                        <Icon className="w-4 h-4" />
+                      )}
+                      {item.label}
+                      {isProfile && unread > 0 && (
+                        <span className="ml-1 inline-flex items-center justify-center text-[10px] min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white">
+                          {unread}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+
+                  {/* Dropdown Logout for Profile */}
+                  {isProfile && user && location.pathname.startsWith("/profile") && (
+                    <div className="absolute right-0 mt-2 w-32 bg-card border rounded-xl shadow-md z-50">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start gap-2"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="w-4 h-4" /> Logout
+                      </Button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
-
-          {!user && (
-            <Link to="/login">
-              <Button variant="hero" size="sm">
-                Masuk
-              </Button>
-            </Link>
-          )}
         </div>
       </nav>
 
@@ -137,96 +155,55 @@ export function Navbar() {
                 const unread = isProfile ? (user?.notifications?.filter((n) => !n.read).length || 0) : 0;
 
                 return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <div
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl transition-colors",
-                        isActive ? "bg-accent text-primary" : "hover:bg-secondary"
-                      )}
+                  <div key={item.path} className="relative">
+                    <Link
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
                     >
-                      {isProfile && user ? (
-                        <img 
-                          src={user.photo} 
-                          alt="Profile" 
-                          className="w-5 h-5 rounded-full object-cover ring-1 ring-primary/20"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = dicebearAvatar(user.name, "Wanita", 64);
-                          }}
-                        />
-                      ) : (
-                        <Icon className="w-5 h-5" />
-                      )}
-                      <span className="font-medium">{item.label}</span>
-                      {isProfile && unread > 0 && (
-                        <span className="ml-auto inline-flex items-center justify-center text-[10px] min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white">
-                          {unread}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
+                      <div
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                          isActive ? "bg-accent text-primary" : "hover:bg-secondary"
+                        )}
+                      >
+                        {isProfile && user ? (
+                          <img
+                            src={user.photo}
+                            alt="Profile"
+                            className="w-5 h-5 rounded-full object-cover ring-1 ring-primary/20"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = dicebearAvatar(user.name, "Wanita", 64);
+                            }}
+                          />
+                        ) : (
+                          <Icon className="w-5 h-5" />
+                        )}
+                        <span className="font-medium">{item.label}</span>
+                        {isProfile && unread > 0 && (
+                          <span className="ml-auto inline-flex items-center justify-center text-[10px] min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white">
+                            {unread}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+
+                    {/* Mobile Dropdown Logout */}
+                    {isProfile && user && location.pathname.startsWith("/profile") && (
+                      <Button
+                        variant="outline"
+                        className="w-full mt-2 justify-start gap-2"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="w-4 h-4" /> Logout
+                      </Button>
+                    )}
+                  </div>
                 );
               })}
-              {!user && (
-                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="hero" className="w-full mt-2">
-                    Masuk
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
         )}
-      </nav>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-pb">
-        <div className="flex items-center justify-around h-16 px-2">
-          {userNavItems.slice(0, 5).map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            const isProfile = item.label === "Profil";
-            const unread = isProfile ? (user?.notifications?.filter((n) => !n.read).length || 0) : 0;
-            
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-xl transition-colors min-w-[60px]",
-                  isActive ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                {isProfile && user ? (
-                  <img 
-                    src={user.photo} 
-                    alt="Profile" 
-                    className={cn(
-                      "w-5 h-5 rounded-full object-cover ring-1 ring-primary/20",
-                      isActive && "animate-bounce-soft"
-                    )}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = dicebearAvatar(user.name, "Wanita", 64);
-                    }}
-                  />
-                ) : (
-                  <Icon className={cn("w-5 h-5", isActive && "animate-bounce-soft")} />
-                )}
-                <span className="text-[10px] font-medium">{item.label}</span>
-                {isProfile && unread > 0 && (
-                  <span className="text-[10px] inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white">
-                    {unread}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
       </nav>
     </>
   );

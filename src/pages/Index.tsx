@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { testimonials, talents } from "@/data/mockData";
 import { TalentCard } from "@/components/TalentCard";
+import { useEffect, useState } from "react";
 
 export default function Index() {
   const features = [
@@ -24,6 +25,15 @@ export default function Index() {
       description: "Platform profesional dengan aturan jelas dan transparan",
     },
   ];
+
+  const [user, setUser] = useState<any>(null);
+
+useEffect(() => {
+  const storedUser = localStorage.getItem("user");
+  if (storedUser) {
+    setUser(JSON.parse(storedUser));
+  }
+}, []);
 
   const stats = [
     { value: "10K+", label: "Pengguna Aktif" },
@@ -286,7 +296,24 @@ export default function Index() {
                 <li><Link to="/talents" className="hover:text-primary transition-colors">Pilih Teman</Link></li>
                 <li><Link to="/bookings" className="hover:text-primary transition-colors">Pemesanan Saya</Link></li>
                 <li><Link to="/chat" className="hover:text-primary transition-colors">Percakapan</Link></li>
-                <li><Link to="/profile" className="hover:text-primary transition-colors">Profil</Link></li>
+                <li>
+  {user ? (
+    <Link to="/profile" className="flex items-center gap-2 hover:text-primary transition-colors">
+      {user.photo && (
+        <img
+          src={user.photo}
+          alt="Profile"
+          className="w-6 h-6 rounded-full object-cover"
+        />
+      )}
+      Profil
+    </Link>
+  ) : (
+    <span className="text-muted-foreground opacity-50 cursor-not-allowed">
+      Profil
+    </span>
+  )}
+</li>
               </ul>
             </div>
 

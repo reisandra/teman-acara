@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import {
   User,
   Edit3,
@@ -39,16 +39,19 @@ import {
 } from "@/lib/userStore";
 import { getBookings } from "@/lib/bookingStore";
 import { dicebearAvatar } from "@/lib/utils";
+import { logoutUser } from "@/lib/userStore";
+
 
 const TOP_UP_OPTIONS = [50000, 100000, 250000];
+
 
 export default function Profile() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("bookings");
   const [isEditing, setIsEditing] = useState(false);
-  const [userData, setUserData] = useState<UserProfile>(getCurrentUser);
-  const [editData, setEditData] = useState<UserProfile>(getCurrentUser);
+  const [userData, setUserData] = useState<UserProfile | null>(null);
+const [editData, setEditData] = useState<UserProfile | null>(null);
   
   // Photo Modal State
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
@@ -73,16 +76,23 @@ export default function Profile() {
   }>({ isOpen: false, talentId: "", bookingId: "" });
   const [ratedBookings, setRatedBookings] = useState<string[]>([]);
   const [ratedDetails, setRatedDetails] = useState<Record<string, { rating: number; comment: string; talentId: string }>>({});
-  const notifications = userData.notifications || [];
+  const notifications = userData?.notifications || [];
 
-  // Fungsi untuk memuat data booking
- // Fungsi untuk memuat data booking - perlu dibuat async
-const loadUserBookings = useCallback(async () => {
+  const loadUserBookings = useCallback(async () => {
   setIsLoadingBookings(true);
   try {
     // Ambil data booking dari bookingStore - perlu await karena sekarang mengembalikan Promise
     const allBookings = await getBookings();
     const currentUser = getCurrentUser();
+    // 🔐 CEK DULU APAKAH USER ADA
+if (!currentUser) {
+  console.log("User belum login, skip load bookings");
+  setBookings([]);
+  setIsLoadingBookings(false);
+  return;
+}
+
+  
     
     console.log("Current user:", currentUser); // Debug log
     console.log("All bookings:", allBookings); // Debug log
@@ -141,6 +151,16 @@ const loadUserBookings = useCallback(async () => {
   }
 }, [toast]);
 
+useEffect(() => {
+  const user = getCurrentUser();
+
+  if (user) {
+    setUserData(user);
+    setEditData(user);
+    loadUserBookings();
+  }
+}, [loadUserBookings, refreshTrigger]);
+
 // Fungsi untuk refresh manual - perlu dibuat async
 const handleRefreshBookings = async () => {
   setIsRefreshing(true);
@@ -153,27 +173,42 @@ const handleRefreshBookings = async () => {
 };
 
 // Load user from store on mount and subscribe
-useEffect(() => {
-  const user = getCurrentUser();
-  setUserData(user);
-  setEditData(user);
-  loadUserBookings(); // Muat data booking saat komponen dimuat
+
   
+useEffect(() => {
   try {
     const stored = localStorage.getItem("rentmate_user_reviews");
     if (stored) {
-      const arr = JSON.parse(stored) as Array<{ bookingId: string; rating: number; comment: string; talentId: string }>;
-      const map: Record<string, { rating: number; comment: string; talentId: string }> = {};
+      const arr = JSON.parse(stored) as Array<{
+        bookingId: string;
+        rating: number;
+        comment: string;
+        talentId: string;
+      }>;
+
+      const map: Record<
+        string,
+        { rating: number; comment: string; talentId: string }
+      > = {};
+
       const ids: string[] = [];
+
       arr.forEach((it) => {
-        map[it.bookingId] = { rating: it.rating, comment: it.comment, talentId: it.talentId };
+        map[it.bookingId] = {
+          rating: it.rating,
+          comment: it.comment,
+          talentId: it.talentId,
+        };
         ids.push(it.bookingId);
       });
+
       setRatedDetails(map);
       setRatedBookings(ids);
     }
-  } catch {}
-}, [loadUserBookings, refreshTrigger]);
+  } catch (error) {
+    console.error("Failed to load reviews:", error);
+  }
+}, []);
 
 // Tambahkan event listener untuk update booking
 useEffect(() => {
@@ -234,15 +269,15 @@ useEffect(() => {
   };
 
   const handleLogout = () => {
-    // Clear user session simulation
-    // Since userStore returns default if empty, we just navigate to login
-    // In a real app we would clear token/storage
-    toast({
-      title: "Berhasil Keluar",
-      description: "Sampai jumpa kembali!",
-    });
-    navigate("/login");
-  };
+  logoutUser();
+
+  toast({
+    title: "Berhasil Keluar",
+    description: "Sampai jumpa kembali!",
+  });
+
+  navigate("/login");
+};
 
   // Photo Handling
   const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,6 +366,12 @@ useEffect(() => {
       path: "/syarat-ketentuan" 
     },
   ];
+
+
+
+if (!editData) {
+  return null;
+}
 
   return (
     <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-24 md:pb-8">

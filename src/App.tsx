@@ -1,5 +1,4 @@
-// src/App.tsx
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -10,9 +9,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import MainLayout from "@/components/layout/MainLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+
 // USER PAGES
 import Index from "./pages/Index";
-import Login from "./pages/Login";
 import Talents from "./pages/Talents";
 import TalentDetail from "./pages/TalentDetail";
 import Booking from "./pages/Booking";
@@ -77,14 +78,14 @@ export default function App() {
         <Toaster />
         <Sonner />
 
-        <BrowserRouter>
+        <HashRouter>
           <Routes>
 
             {/* ================= USER (WITH NAVBAR) ================= */}
             <Route element={<MainLayout />}>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route path="/talents" element={<Talents />} />
               <Route path="/talent/:id" element={<TalentDetail />} />
               <Route path="/booking/:id" element={<Booking />} />
@@ -131,7 +132,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
 
           </Routes>
-        </BrowserRouter>
+        </HashRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -1,4 +1,3 @@
-// src/pages/Register.tsx
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -21,22 +20,23 @@ export default function Register() {
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phone: "",
-    address: "",
-    description: "",
-    age: "",
-  });
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  phone: "",
+  address: "",
+  description: "",
+  birthDate: "",
+  hobby: "", // ✅ TAMBAHKAN
+});
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+    const numericValue = e.target.value.replace(/[^0-9]/g, "");
     setFormData(prev => ({ ...prev, phone: numericValue }));
   };
 
@@ -75,41 +75,81 @@ export default function Register() {
       .toUpperCase();
   };
 
+  const calculateAge = (birthDate: string) => {
+  const today = new Date();
+  const birth = new Date(birthDate);
+
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  return age;
+};
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      toast({ title: "Register Gagal", description: "Password tidak cocok", variant: "destructive" });
+      toast({
+        title: "Register Gagal",
+        description: "Password tidak cocok",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (!formData.age || isNaN(Number(formData.age)) || Number(formData.age) < 17 || Number(formData.age) > 65) {
-      toast({ title: "Register Gagal", description: "Umur harus diisi antara 17-65 tahun", variant: "destructive" });
-      return;
-    }
+    if (!formData.birthDate) {
+  toast({
+    title: "Register Gagal",
+    description: "Tanggal lahir wajib diisi",
+    variant: "destructive",
+  });
+  return;
+}
+
+const age = calculateAge(formData.birthDate);
+
+if (age < 17 || age > 65) {
+  toast({
+    title: "Register Gagal",
+    description: "Umur harus 17-65 tahun",
+    variant: "destructive",
+  });
+  return;
+}
 
     if (!formData.name || !formData.email || !formData.password || !formData.phone || !formData.address) {
-      toast({ title: "Register Gagal", description: "Semua field wajib diisi", variant: "destructive" });
+      toast({
+        title: "Register Gagal",
+        description: "Semua field wajib diisi",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsLoading(true);
+
     try {
       await registerUser({
-        id: "user_" + Date.now(),
-        name: formData.name,
-        username: formData.email.split("@")[0],
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone,
-        address: formData.address,
-        description: formData.description,
-        photo: profileImagePreview || "", // jika kosong → nanti bisa pakai avatar/inisial
-        age: Number(formData.age),
-        wallet: 0,
-        notifications: [],
-        joinDate: new Date().toLocaleDateString(),
-      });
+  id: "user_" + Date.now(),
+  name: formData.name,
+  username: formData.email.split("@")[0],
+  email: formData.email,
+  password: formData.password,
+  phone: formData.phone,
+  address: formData.address,
+  description: formData.description,
+  age: age, // ✅ ini yang benar
+  birthDate: formData.birthDate, 
+  hobby: formData.hobby,
+  photo: profileImagePreview || "",
+  wallet: 0,
+  notifications: [],
+  joinDate: new Date().toLocaleDateString(),
+});
 
       toast({
         title: "Register Berhasil 🎉",
@@ -128,19 +168,32 @@ export default function Register() {
     }
   };
 
+  const isFormValid =
+  formData.name &&
+  formData.email &&
+  formData.password &&
+  formData.confirmPassword &&
+  formData.phone &&
+  formData.address &&
+  formData.birthDate &&
+  formData.password === formData.confirmPassword;
+
   return (
     <div className="min-h-screen bg-gradient-warm flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-hero rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
             {profileImagePreview ? (
-              <img src={profileImagePreview} alt="Profile Preview" className="w-full h-full object-cover" />
+              <img src={profileImagePreview} alt="Preview" className="w-full h-full object-cover" />
             ) : formData.name ? (
-              <span className="text-white text-xl font-bold">{getInitials(formData.name)}</span>
+              <span className="text-white text-xl font-bold">
+                {getInitials(formData.name)}
+              </span>
             ) : (
               <UserPlus className="w-8 h-8 text-white" />
             )}
           </div>
+
           <h1 className="text-2xl font-bold">Daftar User Baru</h1>
           <p className="text-muted-foreground text-sm mt-2">
             Buat akun untuk mulai menggunakan platform
@@ -149,8 +202,8 @@ export default function Register() {
 
         <form onSubmit={handleRegister} className="space-y-6">
 
-          {/* Upload Foto Profil (Opsional) */}
-          <div className="space-y-2 text-center">
+          {/* Upload Foto Opsional */}
+          <div className="text-center">
             <input
               type="file"
               accept="image/*"
@@ -158,19 +211,19 @@ export default function Register() {
               className="hidden"
               onChange={handleProfileImageUpload}
             />
-            <Button variant="outline" size="sm" onClick={() => profileImageRef.current?.click()}>
+            <Button type="button" variant="outline" size="sm" onClick={() => profileImageRef.current?.click()}>
               <Upload className="w-4 h-4 mr-2" />
-              Pilih Foto Profil (Opsional)
+              Pilih Foto 
             </Button>
-            <p className="text-xs text-muted-foreground mt-1">Jika tidak ada, akan menggunakan avatar/inisial</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Jika tidak upload, avatar akan menggunakan inisial nama
+            </p>
           </div>
 
-          {/* Nama, Email, Password, Umur, Telepon, Alamat, Deskripsi → sama seperti MitraRegister */}
+          {/* Form Fields */}
           <div className="space-y-2">
-            <Label htmlFor="name">Nama Lengkap</Label>
+            <Label>Nama Lengkap</Label>
             <Input
-              id="name"
-              placeholder="Masukkan nama lengkap"
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
               required
@@ -178,11 +231,9 @@ export default function Register() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label>Email</Label>
             <Input
-              id="email"
               type="email"
-              placeholder="email@contoh.com"
               value={formData.email}
               onChange={(e) => handleInputChange("email", e.target.value)}
               required
@@ -190,59 +241,65 @@ export default function Register() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label>Password</Label>
             <div className="relative">
               <Input
-                id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Masukkan password"
                 value={formData.password}
                 onChange={(e) => handleInputChange("password", e.target.value)}
                 required
               />
-              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)}>
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={() => setShowPassword(!showPassword)}
+              >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
+            <Label>Konfirmasi Password</Label>
             <div className="relative">
               <Input
-                id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
-                placeholder="Konfirmasi password"
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
                 required
               />
-              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="age">Umur</Label>
+            <Label>Tanggal Lahir</Label>
             <Input
-              id="age"
-              type="number"
-              placeholder="Masukkan umur (17-65 tahun)"
-              value={formData.age}
-              onChange={(e) => handleInputChange("age", e.target.value)}
-              min="17"
-              max="65"
+              type="date"
+              value={formData.birthDate}
+              onChange={(e) => handleInputChange("birthDate", e.target.value)}
               required
             />
           </div>
 
+        <div className="space-y-2">
+          <Label>Hobi</Label>
+          <Input
+            value={formData.hobby}
+            onChange={(e) => handleInputChange("hobby", e.target.value)}
+          />
+        </div>
+
           <div className="space-y-2">
-            <Label htmlFor="phone">Nomor Telepon</Label>
+            <Label>Nomor Telepon</Label>
             <Input
-              id="phone"
               type="tel"
-              placeholder="Masukkan nomor telepon"
               value={formData.phone}
               onChange={handlePhoneChange}
               required
@@ -250,10 +307,8 @@ export default function Register() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address">Alamat</Label>
+            <Label>Alamat</Label>
             <Input
-              id="address"
-              placeholder="Masukkan alamat lengkap"
               value={formData.address}
               onChange={(e) => handleInputChange("address", e.target.value)}
               required
@@ -261,10 +316,8 @@ export default function Register() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Deskripsi Diri</Label>
+            <Label>Deskripsi Diri</Label>
             <Textarea
-              id="description"
-              placeholder="Ceritakan tentang diri Anda"
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
               rows={3}
@@ -275,11 +328,12 @@ export default function Register() {
             {isLoading ? "Mendaftar..." : "Daftar User"}
           </Button>
 
-          <div className="mt-6 pt-6 border-t text-center">
+          <div className="pt-6 border-t text-center">
             <Button variant="outline" size="sm" onClick={() => navigate("/login")}>
               Kembali ke Login
             </Button>
           </div>
+
         </form>
       </Card>
     </div>

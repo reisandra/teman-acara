@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    // Proxy configuration untuk backend
+     historyApiFallback: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001', // Backend Node.js server

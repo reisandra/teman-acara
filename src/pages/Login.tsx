@@ -1,3 +1,5 @@
+// src/pages/Login.tsx
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
@@ -5,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { registerUser } from "@/lib/userStore";
+import { useAuth } from "@/hooks/useAuth"; 
+import { loginUser } from "@/lib/userStore";
 
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth(); // 2. AMBIL FUNGSI login DARI useAuth
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -17,38 +21,27 @@ export default function Login() {
     password: "",
   });
 
- const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
+  const handleLogin = async (e: React.FormEvent) => { // <-- 1. Tambahkan 'async' di sini
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const user = await loginUser(formData.email, formData.password);
 
-    const storedUser = localStorage.getItem("rentmate_user");
+      login(user); 
+      toast({ title: "Login Berhasil! 🎉" });
+      navigate("/", { replace: true });
 
-    if (!storedUser) {
-      throw new Error("User tidak ditemukan");
+    } catch (err: any) {
+      toast({
+        title: "Login Gagal",
+        description: err.message || "Email atau password salah",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    const parsedUser = JSON.parse(storedUser);
-
-    if (parsedUser.email !== formData.email) {
-      throw new Error("Email tidak cocok");
-    }
-
-    toast({ title: "Login Berhasil! 🎉" });
-
-    navigate("/profile", { replace: true });
-  } catch (err) {
-    toast({
-      title: "Login Gagal",
-      description: "Email atau password salah",
-      variant: "destructive",
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gradient-warm flex items-center justify-center p-4 pt-20 md:pt-4">

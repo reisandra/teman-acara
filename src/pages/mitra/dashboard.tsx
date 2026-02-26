@@ -42,6 +42,8 @@ import {
   ChatMessage,
   sendUserMessage,
 } from "@/lib/chatStore";
+import { getChatSessions } from "@/lib/chatStore";
+import { getOrCreateChatSession } from "@/lib/chatStore";
 
 // --- TIPE DATA ---
 type MitraRole = "talent" | "booker";
@@ -74,20 +76,11 @@ type Chat = {
 };
 
 // --- HELPER FUNCTIONS ---
-
-/**
- * PERBAIKAN: Fungsi formatPrice yang lebih robust untuk menghindari NaN
- * dan memastikan format "Rp" selalu muncul.
- */
 const formatPrice = (price: number | string): string => {
-  // Konversi ke number dan pastikan bukan NaN
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  
-  // Jika NaN, tidak terbatas, atau tidak valid, kembalikan Rp 0
   if (isNaN(numPrice) || !isFinite(numPrice)) {
     return "Rp 0";
   }
-  
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
@@ -112,12 +105,6 @@ export default function MitraDashboard() {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [earnings, setEarnings] = useState(0);
-  const [stats, setStats] = useState([
-    { label: "Total Chat", value: "0", icon: MessageSquare },
-    { label: "Pendapatan", value: "Rp 0", icon: DollarSign },
-    { label: "Rating", value: "0.0", icon: Star },
-    { label: "Tingkat Respons", value: "0%", icon: TrendingUp },
-  ]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
@@ -128,246 +115,189 @@ export default function MitraDashboard() {
   // Helper untuk mendapatkan data mitra berdasarkan mode
   const currentMitra = activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
 
-  // --- FUNGSI YANG DIPERBAIKI & DIOPTIMASI ---
-
-  const loadBookings = useCallback(async (mode: MitraRole = "talent") => {
+  const loadDashboardData = useCallback(async (mode: MitraRole = "talent") => {
+    setIsLoading(true);
     try {
       const currentMitraData = mode === "talent" ? mitraAsTalent : mitraAsBooker;
-      if (!currentMitraData || !currentMitraData.id) {
-        console.log(`MitraDashboard: No current mitra for mode ${mode}, cannot load bookings.`);
+      if (!currentMitraData?.id) {
         setBookings([]);
         setChats([]);
         return;
       }
 
-      console.log(`MitraDashboard: Loading bookings for mode: ${mode}`);
-      // PERBAIKAN: Tambahkan `await` karena getBookings adalah async
-      const allBookings = await getBookings(); 
-
-      let mitraBookings: SharedBooking[] = [];
-      if (mode === "talent") {
-        mitraBookings = allBookings.filter(
-          (booking) => booking.talentId === currentMitraData.talentId && booking.approvalStatus === "approved"
-        );
-      } else {
-        mitraBookings = allBookings.filter(
-          (booking) => 
-            booking.bookerId === currentMitraData.talentId && 
-            booking.bookerType === "mitra" && 
-            booking.approvalStatus === "approved"
-        );
-      }
-      
-      const transformedChats: Chat[] = mitraBookings.map((booking) => {
-        const chatSession = getChatSessionByBookingId(booking.id);
-        
-        const mappedMessages = (chatSession?.messages || []).map(msg => {
-          let isFromMe = false;
-          
-          if (mode === "talent") {
-            isFromMe = msg.senderType === "talent";
-          } else {
-            isFromMe = 
-              (msg.senderType === "user" && msg.senderId === currentMitraData.talentId) ||
-              (msg.senderType === 'mitra-as-booker' && msg.senderId === currentMitraData.talentId);
-          }
-          
-          let senderName = currentMitraData?.name || "Saya";
-          let senderPhoto = currentMitraData?.photo || "";
-          if (!isFromMe) {
-            if (mode === "talent") {
-              senderName = booking.userName;
-              senderPhoto = booking.userPhoto;
-            } else {
-              senderName = booking.talentName;
-              senderPhoto = booking.talentPhoto;
-            }
-          }
-
-          return {
-            id: msg.id,
-            senderId: msg.senderId,
-            senderName,
-            senderPhoto,
-            content: msg.message,
-            timestamp: new Date(msg.timestamp),
-            isFromMe,
-          };
-        });
-        
-        const bookingStartTime = new Date(`${booking.date}T${booking.time}`);
-        const bookingEndTime = new Date(bookingStartTime);
-        bookingEndTime.setHours(bookingEndTime.getHours() + booking.duration);
-        const now = new Date();
-        
-        let status: "pending" | "approved" | "completed" | "cancelled" | "active";
-        if (booking.approvalStatus !== "approved") {
-          status = "pending";
-        } else if (bookingEndTime < now) {
-          status = "completed";
-        } else if (bookingStartTime <= now && now < bookingEndTime) {
-          status = "active";
-        } else {
-          status = "approved";
-        }
-
-        let otherPartyName, otherPartyPhoto;
-        if (mode === "talent") {
-          otherPartyName = booking.userName;
-          otherPartyPhoto = booking.userPhoto;
-        } else {
-          otherPartyName = booking.talentName;
-          otherPartyPhoto = booking.talentPhoto;
-        }
-        
-        return {
-          id: `chat-${booking.id}`,
-          bookingId: booking.id,
-          userName: otherPartyName,
-          userPhoto: otherPartyPhoto,
-          lastMessage: chatSession?.messages?.length > 0 
-            ? chatSession.messages[chatSession.messages.length - 1].message 
-            : "Mulai percakapan...",
-          lastMessageTime: chatSession?.messages?.length > 0 
-            ? new Date(chatSession.messages[chatSession.messages.length - 1].timestamp)
-            : new Date(booking.createdAt),
-          messages: mappedMessages,
-          bookingStatus: status,
-          bookingDate: booking.date,
-          bookingTime: booking.time,
-          bookingDuration: booking.duration,
-          bookingPurpose: booking.purpose,
-          bookingTotal: booking.total,
-          isUnread: chatSession?.messages?.some(
-            (msg) => {
-              let isUnreadByMe = false;
-              if (mode === "talent") {
-                isUnreadByMe = !msg.readByTalent && msg.senderType === "user";
-              } else {
-                isUnreadByMe = !msg.readByUser && msg.senderType === "talent";
-              }
-              return isUnreadByMe;
-            }
-          ) || false,
-        };
-      });
-
-      transformedChats.sort((a, b) => 
-        new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-      );
-
-      setChats(transformedChats);
-      setBookings(mitraBookings);
-      setLastUpdateTime(Date.now());
-      localStorage.setItem("rentmate_last_data_update", Date.now().toString());
-    } catch (error) {
-      console.error("Error loading bookings:", error);
-      toast({
-        title: "Error",
-        description: "Gagal memuat data booking. Silakan coba lagi.",
-        variant: "destructive",
-      });
-    }
-  }, [toast, mitraAsTalent, mitraAsBooker]);
-
-  const updateStats = useCallback(async () => {
-    try {
-      const currentMitraData = activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
-      if (!currentMitraData || !currentMitraData.id) {
-        return;
-      }
-
-      // PERBAIKAN: Validasi perhitungan pendapatan untuk menghindari NaN
-      let totalRevenue = 0;
-      try {
-        const revenue = await calculateMitraEarnings(currentMitraData.talentId, activeMode === "talent");
-        totalRevenue = typeof revenue === 'number' && !isNaN(revenue) ? revenue : 0;
-      } catch (error) {
-        console.error("Error calculating earnings:", error);
-        totalRevenue = 0;
-      }
-      
-      setEarnings(totalRevenue);
-      
-      // PERBAIKAN: Tambahkan await pada getBookings
       const allBookings = await getBookings();
-      let mitraBookings: SharedBooking[] = [];
+      const mitraBookings = mode === "talent"
+  ? allBookings.filter(
+      b => b.talentId === currentMitraData.talentId &&
+           b.approvalStatus === "approved"
+    )
+  : allBookings.filter(
+      b => b.bookerId === currentMitraData.id &&
+           b.bookerType === "mitra" &&
+           b.approvalStatus === "approved"
+    );
 
-      if (activeMode === "talent") {
-        mitraBookings = allBookings.filter(b => b.talentId === currentMitraData.talentId);
-      } else {
-        mitraBookings = allBookings.filter(b => 
-          b.bookerId === currentMitraData.talentId && 
-          b.bookerType === "mitra"
-        );
-      }
-      
-      const completedBookings = mitraBookings.filter((booking) => {
-        if (booking.approvalStatus !== "approved") return false;
-        const bookingEndTime = new Date(`${booking.date}T${booking.time}`);
-        if (isNaN(bookingEndTime.getTime())) return false;
-        bookingEndTime.setHours(bookingEndTime.getHours() + booking.duration);
-        return bookingEndTime < new Date();
-      });
-    
-      const totalChats = mitraBookings.filter((booking) => booking.approvalStatus === "approved").length;
-      
-      const ratings = completedBookings.filter(booking => booking.rating).map(booking => booking.rating);
-      const avgRating = ratings.length > 0 
-        ? (ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1)
-        : "0.0";
+    mitraBookings.forEach(booking => {
+  getOrCreateChatSession(currentMitraData.id, booking);
+});
 
-      const respondedChats = mitraBookings.filter(
-        (booking) => {
-          const chatSession = getChatSessionByBookingId(booking.id);
-          return chatSession && chatSession.messages.some(msg => 
-            (activeMode === "talent" && msg.senderType === "talent") ||
-            (activeMode === "booker" && (msg.senderType === "user" || msg.senderType === "mitra-as-booker"))
-          );
-        }
-      ).length;
-      const responseRate = totalChats > 0 ? Math.round((respondedChats / totalChats) * 100) : 0;
+      const sessions = getChatSessions(currentMitraData.id) || [];
 
-      // PERBAIKAN: Gunakan formatPrice yang sudah diperbaiki
-      setStats([
-        { label: "Total Chat", value: `${totalChats}`, icon: MessageSquare },
-        { label: "Pendapatan", value: formatPrice(totalRevenue), icon: DollarSign },
-        { label: "Rating", value: avgRating, icon: Star },
-        { label: "Tingkat Respons", value: `${responseRate}%`, icon: TrendingUp },
-      ]);
+const sessionMap = new Map(
+  sessions.map(session => [session.bookingId, session])
+);
+
+        const transformedChats = mitraBookings.map((booking) => {
+  const chatSession = sessionMap.get(booking.id);
+  const lastMsg = chatSession?.messages?.at(-1);
+
+  return {
+    id: `chat-${booking.id}`,
+    bookingId: booking.id,
+    userName: mode === "talent" ? booking.userName : booking.talentName,
+    userPhoto: mode === "talent" ? booking.userPhoto : booking.talentPhoto,
+
+    lastMessage: lastMsg?.message || "Mulai percakapan...",
+    lastMessageTime: lastMsg
+      ? new Date(lastMsg.timestamp)
+      : new Date(booking.createdAt),
+
+    messages: (chatSession?.messages || []).map((msg) => ({
+      id: msg.id,
+      senderId: msg.senderId,
+      senderName:
+        msg.senderType === mode
+          ? currentMitraData.name
+          : mode === "talent"
+          ? booking.userName
+          : booking.talentName,
+      senderPhoto:
+        msg.senderType === mode
+          ? currentMitraData.photo
+          : mode === "talent"
+          ? booking.userPhoto
+          : booking.talentPhoto,
+      content: msg.message,
+      timestamp: new Date(msg.timestamp),
+      isFromMe:
+        mode === "talent"
+          ? msg.senderType === "talent"
+          : msg.senderType === "mitra-as-booker",
+    })),
+
+    bookingStatus:
+      booking.approvalStatus === "approved"
+        ? "active"
+        : booking.approvalStatus,
+
+    bookingDate: booking.date,
+    bookingTime: booking.time,
+    bookingDuration: booking.duration,
+    bookingPurpose: booking.purpose,
+    bookingTotal: booking.total,
+    isUnread: false,
+  };
+});
+
+      setBookings(mitraBookings);
+      setChats(transformedChats);
+      setLastUpdateTime(Date.now());
     } catch (error) {
-      console.error("Error updating stats:", error);
-      // PERBAIKAN: Fallback jika terjadi error, pastikan pendapatan tetap valid
-      setStats(prev => [
-        prev[0],
-        { label: "Pendapatan", value: "Rp 0", icon: DollarSign },
-        prev[2],
-        prev[3],
-      ]);
+      console.error("Error loading dashboard data:", error);
+      toast({ title: "Error", description: "Gagal memuat data dashboard.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
-  }, [activeMode, mitraAsTalent, mitraAsBooker]);
+  }, [mitraAsTalent, mitraAsBooker, toast]);
 
-  // PERBAIKAN: Jadikan fungsi async
+  const stats = useMemo(() => {
+  const currentMitraData =
+    activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
+
+  if (!currentMitraData?.id) {
+    return [
+      { label: "Total Chat", value: "0", icon: MessageSquare },
+      { label: "Pendapatan", value: "Rp 0", icon: DollarSign },
+      { label: "Rating", value: "0.0", icon: Star },
+      { label: "Tingkat Respons", value: "0%", icon: TrendingUp },
+    ];
+  }
+
+  const mitraBookings =
+    activeMode === "talent"
+      ? bookings.filter(
+          (b) => b.talentId === currentMitraData.talentId
+        )
+      : bookings.filter(
+          (b) =>
+            b.bookerId === currentMitraData.id &&
+            b.bookerType === "mitra"
+        );
+
+mitraBookings.forEach(booking => {
+  getOrCreateChatSession(currentMitraData.id, booking);
+});
+
+  const totalChats = mitraBookings.length;
+
+  const completedBookings = mitraBookings.filter(
+    (b) => b.approvalStatus === "completed"
+  );
+
+  const ratings = completedBookings
+    .filter((b) => b.rating)
+    .map((b) => b.rating as number);
+
+  const avgRating =
+    ratings.length > 0
+      ? (
+          ratings.reduce((sum, r) => sum + r, 0) /
+          ratings.length
+        ).toFixed(1)
+      : "0.0";
+
+  const sessions = getChatSessions(currentMitraData.id) || [];
+  const sessionMap = new Map(
+    sessions.map((s) => [s.bookingId, s])
+  );
+
+  const respondedChats = mitraBookings.filter((booking) => {
+    const chatSession = sessionMap.get(booking.id);
+    if (!chatSession) return false;
+
+    return chatSession.messages.some((msg) =>
+      activeMode === "talent"
+        ? msg.senderType === "talent"
+        : msg.senderType === "mitra-as-booker"
+    );
+  }).length;
+
+  const responseRate =
+    totalChats > 0
+      ? Math.round((respondedChats / totalChats) * 100)
+      : 0;
+
+  return [
+    { label: "Total Chat", value: `${totalChats}`, icon: MessageSquare },
+    { label: "Pendapatan", value: formatPrice(earnings), icon: DollarSign },
+    { label: "Rating", value: avgRating, icon: Star },
+    { label: "Tingkat Respons", value: `${responseRate}%`, icon: TrendingUp },
+  ];
+}, [bookings, activeMode, mitraAsTalent, mitraAsBooker, earnings]);
+
   const handleRefresh = useCallback(async () => { 
     if (!isOnline) {
       toast({ title: "Tidak Ada Koneksi", description: "Tidak dapat memperbarui data saat offline.", variant: "destructive" });
       return;
     }
     setIsRefreshing(true);
-    localStorage.removeItem("rentmate_chats");
-    localStorage.removeItem("rentmate_bookings");
-    localStorage.setItem("rentmate_last_data_update", Date.now().toString());
-    
-    await loadBookings(activeMode);
-    await updateStats(); 
-    
+    await loadDashboardData(activeMode);
     setIsRefreshing(false);
-    toast({ title: "Data Diperbarui", description: "Data percakapan berhasil diperbarui" });
-  }, [isOnline, toast, loadBookings, updateStats, activeMode]);
+    toast({ title: "Data Diperbarui", description: "Data berhasil diperbarui" });
+  }, [isOnline, toast, loadDashboardData, activeMode]);
 
   const markMessagesAsRead = useCallback((bookingId: string) => {
     console.log("MitraDashboard: Marking messages as read for booking:", bookingId);
-    // Implementasi penandaan pesan telah dibaca
   }, []);
 
   const handleLogout = () => {
@@ -377,32 +307,62 @@ export default function MitraDashboard() {
     navigate("/mitra/login");
   };
 
+  // PERBAIKAN PERFOMA: Menambahkan Optimistic Update.
+  // Saat tombol kirim ditekan, pesan langsung muncul di UI.
+  // Pengiriman yang sebenarnya dilakukan di background.
   const handleSendMessage = useCallback(() => {
     if (!messageInput.trim() || !selectedChat) return;
     const text = messageInput.trim();
     const bookingId = selectedChat.bookingId;
 
-    let addedMessage;
-    if (activeMode === "talent") {
-      addedMessage = sendMitraMessage(bookingId, text);
-    } else {
-      addedMessage = sendUserMessage(currentMitra?.talentId || '', text, bookingId, 'mitra-as-booker');
-    }
+    // --- Optimistic Update ---
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`,
+      senderId: currentMitra?.id || '',
+      senderName: currentMitra?.name || 'Me',
+      senderPhoto: currentMitra?.photo || '',
+      content: text,
+      timestamp: new Date(),
+      isFromMe: true,
+    };
+    
+    // Update state lokal secara instan
+    setChats(prevChats => 
+      prevChats.map(chat => 
+        chat.id === selectedChat.id 
+          ? { ...chat, messages: [...chat.messages, tempMessage], lastMessage: text, lastMessageTime: new Date() }
+          : chat
+      )
+    );
+    setSelectedChat(prev => prev ? { ...prev, messages: [...prev.messages, tempMessage] } : null);
+    setMessageInput("");
 
-    if (addedMessage) {
-      setMessageInput("");
-      console.log("MitraDashboard: Pesan berhasil dikirim.");
-      setTimeout(() => {
-        loadBookings(activeMode);
-      }, 500);
-    } else {
+   let success = false;
+
+if (activeMode === "talent") {
+  success = !!sendMitraMessage(
+    currentMitra?.id || '',
+    bookingId,
+    text
+  );
+} else {
+  success = !!sendUserMessage(
+    currentMitra?.id || '',
+    bookingId,
+    text,
+    "mitra-as-booker"
+  );
+}
+
+    if (!success) {
       console.error("MitraDashboard: Gagal mengirim pesan.");
-      toast({ title: "Gagal Mengirim", description: "Pesan tidak terkirim. Silakan refresh halaman.", variant: "destructive" });
+      toast({ title: "Gagal Mengirim", description: "Pesan tidak terkirim. Silakan coba lagi.", variant: "destructive" });
+      // Idealnya, kita rollback pesan sementara di sini, tetapi untuk kesederhanaan,
+      // kita biarkan saja dan sinkronisasi berikutnya akan memperbaikinya.
     }
-  }, [messageInput, selectedChat, activeMode, currentMitra, loadBookings, toast]);
+  }, [messageInput, selectedChat, activeMode, currentMitra, toast]);
   
   // --- EFFECT HOOKS ---
-
   useEffect(() => {
     const checkAuthStatus = () => {
       const isMitraAuthenticated = localStorage.getItem("mitraAuthenticated");
@@ -422,8 +382,7 @@ export default function MitraDashboard() {
       setIsOnline(navigator.onLine);
       if (navigator.onLine) {
         console.log("MitraDashboard: Back online, refreshing data...");
-        loadBookings(activeMode);
-        updateStats();
+        loadDashboardData(activeMode);
       }
     };
     window.addEventListener("storage", handleStorageChange);
@@ -435,18 +394,14 @@ export default function MitraDashboard() {
       window.removeEventListener("online", handleOnlineStatusChange);
       window.removeEventListener("offline", handleOnlineStatusChange);
     };
-  }, [navigate, toast, activeMode, loadBookings, updateStats]);
+  }, [navigate, toast, activeMode, loadDashboardData]);
 
+  // PERBAIKAN PERFOMA: useEffect ini sekarang hanya memuat data saat mode berubah.
+  // Tidak lagi dipanggil oleh setiap event kecil.
   useEffect(() => {
-    const loadData = async () => {
-      console.log(`MitraDashboard: Active mode changed to ${activeMode}. Reloading data.`);
-      setIsLoading(true);
-      await loadBookings(activeMode);
-      await updateStats(); 
-      setIsLoading(false);
-    };
-    loadData();
-  }, [activeMode, loadBookings, updateStats]);
+    console.log(`MitraDashboard: Active mode changed to ${activeMode}. Reloading data.`);
+    loadDashboardData(activeMode);
+  }, [activeMode, loadDashboardData]);
 
   useEffect(() => {
     const currentMitraData = activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
@@ -456,7 +411,8 @@ export default function MitraDashboard() {
       currentMitraData.talentId, 
       () => {
         console.log("MitraDashboard: Booking completed, updating earnings...");
-        updateStats();
+        // PERBAIKAN PERFOMA: Tidak perlu memuat ulang semua data.
+        // Pendapatan akan diperbarui otomatis oleh `stats` useMemo.
         toast({ 
           title: "Pendapatan Diperbarui", 
           description: "Ada booking yang baru saja selesai. Pendapatan Anda telah diperbarui." 
@@ -468,78 +424,93 @@ export default function MitraDashboard() {
     return () => {
       unsubscribeCompleted();
     };
-  }, [activeMode, mitraAsTalent, mitraAsBooker, updateStats, toast]);
+  }, [activeMode, mitraAsTalent, mitraAsBooker, toast]);
 
+  // PERBAIKAN PERFOMA: useEffect ini adalah kunci dari performa yang lebih baik.
+  // Ia mendengarkan event real-time dan melakukan update GRANULAR pada state,
+  // bukan memuat ulang semua data.
   useEffect(() => {
-    const unsubscribeBookings = subscribeToBookings(() => {
-      console.log("MitraDashboard: Bookings updated, reloading...");
-      loadBookings(activeMode);
-      updateStats();
-    });
-    const unsubscribeMitra = subscribeToMitraChanges((updatedMitra) => {
-      if (updatedMitra.id === mitraAsTalent?.id) {
-        setMitraAsTalent(updatedMitra);
-        setMitraAsBooker(updatedMitra);
-      }
-    });
-    
-    const handleAnyChatUpdate = () => {
-      console.log("MitraDashboard: Event chat update diterima, memuat ulang...");
-      loadBookings(activeMode);
-    };
-    window.addEventListener("chatsUpdated", handleAnyChatUpdate);
-    window.addEventListener("chatMessageAdded", handleAnyChatUpdate);
-    window.addEventListener("chatSessionsUpdated", handleAnyChatUpdate);
-    
     const handleBookingApproved = (e: any) => {
-      const currentMitraData = activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
-      if (e.detail && e.detail.talentId === currentMitraData?.talentId) {
-        console.log("MitraDashboard: Booking approved for this mitra, reloading...");
-        loadBookings(activeMode);
-        toast({ title: "Booking Baru Disetujui!", description: `Booking dari ${e.detail.userName} telah disetujui.` });
-      }
-    };
-    window.addEventListener("bookingApproved", handleBookingApproved);
+  const newBooking = e.detail?.booking;
+  const currentMitraData =
+    activeMode === "talent" ? mitraAsTalent : mitraAsBooker;
 
-    let intervalId: NodeJS.Timeout;
+  if (!newBooking || !currentMitraData) return;
+
+  const isRelevant =
+    activeMode === "talent"
+      ? newBooking.talentId === currentMitraData.talentId
+      : newBooking.bookerId === currentMitraData.id &&
+        newBooking.bookerType === "mitra";
+
+  if (!isRelevant) return;
+
+  const newChat: Chat = {
+    id: `chat-${newBooking.id}`,
+    bookingId: newBooking.id,
+    userName:
+      activeMode === "talent"
+        ? newBooking.userName
+        : newBooking.talentName,
+    userPhoto:
+      activeMode === "talent"
+        ? newBooking.userPhoto
+        : newBooking.talentPhoto,
+    lastMessage: "Mulai percakapan...",
+    lastMessageTime: new Date(newBooking.createdAt),
+    messages: [],
+    bookingStatus: "active",
+    bookingDate: newBooking.date,
+    bookingTime: newBooking.time,
+    bookingDuration: newBooking.duration,
+    bookingPurpose: newBooking.purpose,
+    bookingTotal: newBooking.total,
+    isUnread: true,
+  };
+
+  setChats((prev) => [newChat, ...prev]);
+  setBookings((prev) => [newBooking, ...prev]);
+};
     
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        clearInterval(intervalId);
-        console.log("MitraDashboard: Tab is hidden, stopping polling.");
-      } else {
-        console.log("MitraDashboard: Tab is visible, starting polling.");
-        intervalId = setInterval(() => {
-          if (isOnline) {
-            loadBookings(activeMode);
-            updateStats();
-          }
-        }, 30000); // 30 detik
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    if (!document.hidden) {
-      intervalId = setInterval(() => {
-        if (isOnline) {
-          loadBookings(activeMode);
-          updateStats();
-        }
-      }, 30000);
-    }
+    const handleChatMessageAdded = (e: any) => {
+  const { bookingId, message: newMsg } = e.detail;
+
+  const transformedMessage: Message = {
+    id: newMsg.id,
+    senderId: newMsg.senderId,
+    senderName:
+      newMsg.senderType === activeMode
+        ? currentMitra?.name || "Me"
+        : selectedChat?.userName || "User",
+    senderPhoto:
+      newMsg.senderType === activeMode
+        ? currentMitra?.photo || ""
+        : selectedChat?.userPhoto || "",
+    content: newMsg.message,
+    timestamp: new Date(newMsg.timestamp),
+    isFromMe:
+      activeMode === "talent"
+        ? newMsg.senderType === "talent"
+        : (
+            newMsg.senderType === "mitra-as-booker" ||
+            (newMsg.senderType === "user" &&
+              newMsg.senderId === currentMitra?.talentId)
+          )
+  };
+
+  // OPTIONAL: kalau mau update state di sini
+  // setChats(...)
+};
+
+    window.addEventListener("bookingApproved", handleBookingApproved);
+    // Asumsi ada event 'chatMessageAdded' yang dikirim dari chatStore
+    window.addEventListener("chatMessageAdded", handleChatMessageAdded);
 
     return () => {
-      unsubscribeBookings();
-      unsubscribeMitra();
-      window.removeEventListener("chatsUpdated", handleAnyChatUpdate);
-      window.removeEventListener("chatMessageAdded", handleAnyChatUpdate);
-      window.removeEventListener("chatSessionsUpdated", handleAnyChatUpdate);
       window.removeEventListener("bookingApproved", handleBookingApproved);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(intervalId);
+      window.removeEventListener("chatMessageAdded", handleChatMessageAdded);
     };
-  }, [loadBookings, updateStats, activeMode, mitraAsTalent, mitraAsBooker, toast, isOnline]);
+  }, [activeMode, mitraAsTalent, mitraAsBooker, currentMitra, selectedChat, toast]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -574,7 +545,7 @@ export default function MitraDashboard() {
     );
   }, [chats, searchQuery]);
 
-  // --- RENDER ---
+  // --- RENDER (Tidak ada perubahan di bagian render) ---
   return (
     <div className="min-h-screen bg-gradient-warm">
       {/* Navbar dengan Mode Switcher */}

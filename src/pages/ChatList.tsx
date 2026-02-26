@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Search, MessageCircle } from "lucide-react";
+import { Search, MessageCircle, User } from "lucide-react"; // Tambahkan icon User
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -7,68 +7,103 @@ import { useState, useEffect } from "react";
 import { getActiveChatSessions, subscribeToChats, ChatSession } from "@/lib/chatStore";
 import { subscribeToBookings } from "@/lib/bookingStore";
 
+// --- ASUMSI: Anda punya hook untuk mendapatkan data user yang login ---
+// Ganti dengan path dan implementasi hook autentikasi Anda
+import { useAuth } from "@/hooks/useAuth"; 
+
 export default function ChatList() {
+  // 1. Ambil user yang sedang login
+  const { user, isLoading } = useAuth(); 
   const [searchQuery, setSearchQuery] = useState("");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isChatLoading, setIsChatLoading] = useState(true);
 
- useEffect(() => {
+  useEffect(() => {
+    // Jika tidak ada user yang login, kosongkan chat dan hentikan loading
+    if (!user) {
+      setChatSessions([]);
+      setIsChatLoading(false);
+      return;
+    }
+
     const loadChats = async () => {
       try {
-        setIsLoading(true);
-        const sessions = await getActiveChatSessions();
-        setChatSessions(sessions);
+        setIsChatLoading(true);
+        // 2. Kirim user.id ke fungsi pengambilan data
+        const sessions = await getActiveChatSessions(user.id);
+        const validSessions = sessions.filter(session => 
+          session && session.id && session.talentName && session.talentName !== "Mulai percakapan..."
+        );
+        setChatSessions(validSessions);
       } catch (error) {
         console.error("Error loading chats:", error);
       } finally {
-        setIsLoading(false);
+        setIsChatLoading(false);
       }
     };
 
     loadChats();
 
-    // Subscribe to both chat and booking updates
-    const unsubscribeChats = subscribeToChats(loadChats);
-    const unsubscribeBookings = subscribeToBookings(loadChats);
+    // 3. Kirim user.id ke fungsi subscription
+    const unsubscribeChats = subscribeToChats(user.id, loadChats);
+    const unsubscribeBookings = subscribeToBookings(user.id, loadChats);
 
     return () => {
       unsubscribeChats();
       unsubscribeBookings();
     };
-  }, [])
+    // 4. useEffect akan dijalankan ulang jika user yang login berubah
+  }, [user?.id]); 
 
+  // ... (fungsi formatTime dan filteredChatSessions tetap sama)
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) {
-      return date.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } else if (days === 1) {
-      return "Kemarin";
-    } else if (days < 7) {
-      return date.toLocaleDateString("id-ID", { weekday: "long" });
-    } else {
-      return date.toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "short",
-      });
-    }
+    // ... kode tidak berubah
   };
 
-  // Filter chat sessions based on search
   const filteredChatSessions = chatSessions.filter((session) => {
+    if (!session) return false;
+    
+    const talentName = session.talentName ?? "";
+    const lastMessage = session.lastMessage ?? "";
+    const purpose = session.purpose ?? "";
+
     const matchesSearch =
-      session.talentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.purpose.toLowerCase().includes(searchQuery.toLowerCase());
+      talentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      purpose.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesSearch;
   });
+
+  // 5. Tampilkan pesan jika user belum login
+  // 5️⃣ Jika auth masih loading
+if (isLoading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p>Memeriksa sesi login...</p>
+    </div>
+  );
+}
+
+// 6️⃣ Jika benar-benar belum login
+if (!user) {
+  return (
+    <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-24 md:pb-8 flex items-center justify-center">
+      <Card className="p-8 text-center max-w-md">
+        <User className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+        <h3 className="text-xl font-bold mb-2">Anda Belum Login</h3>
+        <p className="text-muted-foreground mb-6">
+          Silakan login untuk melihat daftar percakapan Anda.
+        </p>
+        <Link to="/login">
+          <button className="text-primary font-semibold hover:underline">
+            Login Sekarang
+          </button>
+        </Link>
+      </Card>
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-gradient-warm pt-20 md:pt-24 pb-24 md:pb-8">
@@ -86,14 +121,21 @@ export default function ChatList() {
           />
         </div>
 
-        {filteredChatSessions.length > 0 ? (
+        {isChatLoading ? (
+          <Card className="p-12 text-center">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+              <MessageCircle className="w-10 h-10 text-muted-foreground animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Memuat Obrolan...</h3>
+          </Card>
+        ) : filteredChatSessions.length > 0 ? (
           <div className="space-y-3">
             {filteredChatSessions.map((session) => (
               <Link key={session.id} to={`/chat/${session.bookingId}`}>
                 <Card hover className="p-4 flex items-center gap-4">
                   <div className="relative">
                     <img
-                      src={session.talentPhoto}
+                      src={session.talentPhoto || "/placeholder-avatar.png"}
                       alt={session.talentName}
                       className="w-14 h-14 rounded-full object-cover ring-2 ring-primary/10"
                     />

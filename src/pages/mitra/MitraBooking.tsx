@@ -750,7 +750,6 @@ export default function MitraBooking() {
       paymentStatus: "pending",
       approvalStatus: "pending_approval",
       paymentCode: newPaymentCode,
-      adminMessage: adminMessage,
     });
 
     setCurrentBookingId(booking.id);

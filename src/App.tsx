@@ -89,10 +89,29 @@ export default function App() {
               <Route path="/talents" element={<Talents />} />
               <Route path="/talent/:id" element={<TalentDetail />} />
               <Route path="/booking/:id" element={<Booking />} />
-              <Route path="/chat" element={<ChatList />} />
-              <Route path="/chat/:bookingId" element={<Chat />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/bookings" element={<Bookings />} />
+              <Route path="/chat" element={
+              <ProtectedRoute>
+                <ChatList />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/chat/:bookingId" element={
+              <ProtectedRoute>
+                <Chat />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/bookings" element={
+              <ProtectedRoute>
+                <Bookings />
+              </ProtectedRoute>
+            } />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/syarat-ketentuan" element={<TermsConditions />} />
               <Route path="/kebijakan-privasi" element={<PrivacyPolicy />} />

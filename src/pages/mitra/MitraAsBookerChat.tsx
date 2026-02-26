@@ -43,17 +43,23 @@ export default function MitraAsBookerChatPage() {
   // Dapatkan data mitra yang sedang login
   const currentMitra = getCurrentMitra();
 
-  // Fungsi untuk memuat sesi chat spesifik
   const loadSession = useCallback(() => {
-    if (!bookingId) return;
-    console.log("MitraAsBookerChat: Loading session for booking ID:", bookingId);
-    
-    const chatSession = getChatSessionByBookingId(bookingId);
-    console.log("MitraAsBookerChat: Found session:", chatSession);
-    
-    setSession(chatSession);
-    setIsLoading(false);
-  }, [bookingId]);
+  if (!bookingId || !currentMitra?.talentId) return;
+
+  console.log("MitraAsBookerChat: Loading session");
+  console.log("UserId (mitra):", currentMitra.talentId);
+  console.log("BookingId:", bookingId);
+
+  const chatSession = getChatSessionByBookingId(
+    currentMitra.talentId,   // 🔥 WAJIB ADA
+    bookingId
+  );
+
+  console.log("Found session:", chatSession);
+
+  setSession(chatSession);
+  setIsLoading(false);
+}, [bookingId, currentMitra?.talentId]);
 
   // Fungsi untuk scroll ke bawah
   const scrollToBottom = useCallback(() => {
@@ -93,14 +99,13 @@ export default function MitraAsBookerChatPage() {
 
     try {
       // Gunakan sendUserMessage dengan parameter khusus untuk mitra sebagai booker
-      // PERBAIKAN: Gunakan ID mitra yang sedang login dan tipe 'mitra-as-booker'
       const result = sendUserMessage(
-        currentMitra?.talentId || '', 
-        text, 
-        session.bookingId, 
-        'mitra-as-booker'
+        currentMitra.talentId,
+        session.bookingId,
+        text,
+        "mitra-as-booker"
       );
-      
+            
       if (result) {
         console.log("MitraAsBookerChat: Message sent.");
       } else {
@@ -138,7 +143,10 @@ export default function MitraAsBookerChatPage() {
   useEffect(() => {
     if (session) {
       // Tandai pesan sebagai telah dibaca oleh mitra (sebagai booker)
-      markMessagesAsReadByUser(session.bookingId);
+      markMessagesAsReadByUser(
+      currentMitra.talentId,
+      session.bookingId
+    );
     }
     scrollToBottom();
   }, [session?.bookingId, scrollToBottom]);
@@ -198,80 +206,141 @@ export default function MitraAsBookerChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="container max-w-4xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+  <div className="min-h-screen bg-gray-50 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    {/* CHAT LIST */}
+    <Card className="lg:col-span-1 flex flex-col">
+      <CardHeader>
+        <CardTitle>Chat Saya</CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-y-auto space-y-2">
+        <div className="p-3 rounded-lg border bg-gray-100">
+          <div className="flex justify-between items-center">
+            <p className="font-medium">{session.talentName}</p>
+          </div>
+          <p className="text-sm text-gray-500 truncate">
+            {session.lastMessage}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* CHAT AREA */}
+    <Card className="lg:col-span-2 flex flex-col h-[600px]">
+
+      {/* HEADER */}
+      <div className="p-4 border-b bg-white shrink-0">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => navigate(-1)}
+          >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="flex items-center gap-3">
-            <img src={session.talentPhoto} alt={session.talentName} className="w-10 h-10 rounded-full object-cover border" />
-            <div>
-              <h3 className="font-semibold">{session.talentName}</h3>
-              <p className="text-sm text-muted-foreground">{session.purpose} • {session.duration} jam</p>
-            </div>
+
+          <img
+            src={session.talentPhoto}
+            alt={session.talentName}
+            className="w-10 h-10 rounded-full object-cover border"
+          />
+
+          <div className="flex-1">
+            <h3 className="font-semibold">{session.talentName}</h3>
+            <p className="text-sm text-muted-foreground">
+              {session.purpose} • {session.duration} jam
+            </p>
           </div>
-          <div className="text-sm text-muted-foreground ml-auto">
+
+          <div className="text-sm text-muted-foreground">
             {session.date} • {session.time}
           </div>
         </div>
-        <Card className="h-[600px] flex flex-col">
-          <CardContent ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-            {session.messages.map((msg: ChatMessage) => {
-              // PERUBAHAN KRUSIAL: Perbaikan logika penentuan pesan milik sendiri
-              // Pesan milik sendiri jika:
-              // 1. Tipe pengirim adalah 'user' DAN ID pengirim sama dengan ID mitra yang login
-              // 2. ATAU tipe pengirim adalah 'mitra-as-booker' DAN ID pengirim sama dengan ID mitra yang login
-              const isMe = (
-                (msg.senderType === "user" && msg.senderId === currentMitra?.talentId) ||
-                (msg.senderType === "mitra-as-booker" && msg.senderId === currentMitra?.talentId)
-              );
-              
-              // Debugging
-              console.log(`Message: ${msg.message}, Sender: ${msg.senderId}, Type: ${msg.senderType}, IsMe: ${isMe}`);
-              
-              return (
-                <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[70%] p-3 rounded-lg ${isMe ? "bg-orange-500 text-white" : "bg-gray-200"}`}>
-                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <p className={`text-xs ${isMe ? "text-blue-100" : "text-gray-500"}`}>
-                        {formatTime(msg.timestamp)}
-                      </p>
-                      <StatusIcon msg={msg} isMe={isMe} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {session.isTalentTyping && (
-              <div className="flex justify-start">
-                <div className="max-w-[70%] p-3 rounded-lg bg-gray-200">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
+      </div>
+
+      {/* MESSAGES */}
+      <CardContent
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+      >
+        {session.messages.map((msg: ChatMessage) => {
+          const isMe =
+            msg.senderType === "mitra-as-booker" &&
+            msg.senderId === currentMitra?.talentId;
+
+          return (
+            <div
+              key={msg.id}
+              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[70%] p-3 rounded-lg ${
+                  isMe
+                    ? "bg-orange-500 text-white"
+                    : "bg-gray-200"
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">
+                  {msg.message}
+                </p>
+
+                <div className="flex items-center justify-end gap-1 mt-1">
+                  <p
+                    className={`text-xs ${
+                      isMe
+                        ? "text-blue-100"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {formatTime(msg.timestamp)}
+                  </p>
+                  <StatusIcon msg={msg} isMe={isMe} />
                 </div>
               </div>
-            )}
-          </CardContent>
-          <div className="p-4 border-t shrink-0">
-            <div className="flex gap-2">
-              <Input
-                value={message}
-                onChange={(e) => handleTyping(e.target.value)}
-                placeholder="Ketik pesan..."
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                disabled={isSending}
-              />
-              <Button onClick={handleSend} disabled={!message.trim() || isSending}>
-                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
+            </div>
+          );
+        })}
+
+        {session.isTalentTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-[70%] p-3 rounded-lg bg-gray-200">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150" />
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-300" />
+              </div>
             </div>
           </div>
-        </Card>
+        )}
+      </CardContent>
+
+      {/* INPUT */}
+      <div className="p-4 border-t shrink-0">
+        <div className="flex gap-2">
+          <Input
+            value={message}
+            onChange={(e) => handleTyping(e.target.value)}
+            placeholder="Ketik pesan..."
+            onKeyDown={(e) =>
+              e.key === "Enter" && handleSend()
+            }
+            disabled={isSending}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={!message.trim() || isSending}
+          >
+            {isSending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
       </div>
-    </div>
-  );
+
+    </Card>
+  </div>
+);
 }

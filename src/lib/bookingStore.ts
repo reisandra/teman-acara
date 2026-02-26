@@ -206,7 +206,10 @@ export async function updateBookingApproval(
     }
 
     const commissionPercentage = getAppCommission();
-    const paymentSplit = calculatePaymentSplit(currentBooking.total || 0, commissionPercentage);
+    const paymentSplit = calculatePaymentSplit(
+      currentBooking.total || 0,
+      commissionPercentage
+    );
 
     const dbData = camelToSnake({
       approvalStatus: status,
@@ -221,24 +224,46 @@ export async function updateBookingApproval(
       .select()
       .single();
 
-    if (error) {
-      console.error('Error updating approval:', error);
-      throw error;
+    if (error || !updatedBooking) {
+      throw new Error('Failed to update booking approval');
     }
 
     const camelCaseBooking = snakeToCamel(updatedBooking);
 
-    if (status === 'approved') {
+    if (!camelCaseBooking) {
+      throw new Error("Booking conversion failed");
+    }
+
+    // 🔥 BUAT CHAT HANYA JIKA APPROVED
+    if (status === "approved") {
       console.log(`Booking ${id} telah disetujui.`);
-      getOrCreateChatSession(camelCaseBooking);
+
+      // Chat untuk USER
+      getOrCreateChatSession(
+        camelCaseBooking.bookerId,
+        camelCaseBooking
+      );
+
+      // Chat untuk MITRA
+      getOrCreateChatSession(
+        camelCaseBooking.talentId,
+        camelCaseBooking
+      );
+
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("bookingApproved", { 
-          detail: { booking: camelCaseBooking, timestamp: new Date().toISOString() } 
-        }));
+        window.dispatchEvent(
+          new CustomEvent("bookingApproved", {
+            detail: {
+              booking: camelCaseBooking,
+              timestamp: new Date().toISOString()
+            }
+          })
+        );
       }
     }
 
     return camelCaseBooking;
+
   } catch (error) {
     console.error('Failed to update approval:', error);
     throw error;
